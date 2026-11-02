@@ -176,7 +176,7 @@ export default function ProfilePage() {
                 value={values.fullName}
                 onChange={handleChange}
                 autoComplete="name"
-                placeholder="e.g. Victor Erhabor"
+                placeholder="e.g. Ebuka Doe"
                 required
               />
             </label>

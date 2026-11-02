@@ -124,7 +124,7 @@ IMPLEMENT:
    - keyboard accessible.
 3. Prefer a small eye/eye-off SVG/icon rather than text clutter.
 4. Add meaningful placeholders, for example:
-   - Full name: `e.g. Victor Erhabor`
+   - Full name: `e.g. Ebuka Doe`
    - Email: `you@example.com`
    - Phone: `e.g. 08012345678`
    - Password: helpful neutral placeholder, not a real password.

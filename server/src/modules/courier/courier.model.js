@@ -3,8 +3,8 @@ import { SERVICE_STATUSES } from '../../shared/constants/rydaConfig.js';
 
 const locationSchema = new mongoose.Schema({
   address: { type: String, required: true, trim: true },
-  latitude: { type: Number, required: true, min: -90, max: 90 },
-  longitude: { type: Number, required: true, min: -180, max: 180 }
+  latitude: { type: Number, min: -90, max: 90 },
+  longitude: { type: Number, min: -180, max: 180 }
 }, { _id: false });
 
 const courierDeliverySchema = new mongoose.Schema({

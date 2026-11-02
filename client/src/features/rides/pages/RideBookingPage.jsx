@@ -7,6 +7,30 @@ const OFF_PLATFORM_PAYMENT_WARNING =
 
 const initialLocation = { address: '', latitude: '', longitude: '' };
 
+function hasValidCoordinates(location) {
+  const latitude = Number(location.latitude);
+  const longitude = Number(location.longitude);
+
+  return (
+    String(location.latitude).trim() !== '' &&
+    String(location.longitude).trim() !== '' &&
+    Number.isFinite(latitude) &&
+    Number.isFinite(longitude) &&
+    latitude >= -90 &&
+    latitude <= 90 &&
+    longitude >= -180 &&
+    longitude <= 180
+  );
+}
+
+function formatNaira(amount) {
+  return new Intl.NumberFormat('en-NG', {
+    style: 'currency',
+    currency: 'NGN',
+    maximumFractionDigits: 0
+  }).format(amount);
+}
+
 export default function RideBookingPage() {
   const [pickup, setPickup] = useState(initialLocation);
   const [destination, setDestination] = useState(initialLocation);
@@ -15,7 +39,10 @@ export default function RideBookingPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  const capacity = RYDA_CONFIG.KEKE_SEAT_CAPACITY;
+  const isValidSeatCount = Number.isInteger(bookedSeats) && bookedSeats >= 1 && bookedSeats <= capacity;
   const fare = useMemo(() => bookedSeats * RYDA_CONFIG.RIDE_FARE_PER_SEAT_NGN, [bookedSeats]);
+  const isPrivateRide = bookedSeats === capacity;
 
   const updateLocation = (setter, field) => (event) => {
     setter((location) => ({ ...location, [field]: event.target.value }));
@@ -31,9 +58,13 @@ export default function RideBookingPage() {
       return;
     }
 
-    const coordinates = [pickup.latitude, pickup.longitude, destination.latitude, destination.longitude];
-    if (coordinates.some((value) => value === '' || Number.isNaN(Number(value)))) {
-      setError('Enter valid latitude and longitude for both locations.');
+    if (!isValidSeatCount) {
+      setError(`Choose between 1 and ${capacity} seats.`);
+      return;
+    }
+
+    if (!hasValidCoordinates(pickup) || !hasValidCoordinates(destination)) {
+      setError('Add valid map coordinates for both locations before requesting your ride.');
       return;
     }
 
@@ -61,79 +92,152 @@ export default function RideBookingPage() {
   }
 
   return (
-    <section className="mx-auto max-w-2xl rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Book a Keke</h1>
-        <p className="mt-1 text-sm text-slate-600">Choose your route and the number of seats you need.</p>
-      </div>
+    <section className="mx-auto max-w-2xl py-2 sm:py-6">
+      <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 sm:p-8">
+        <header className="border-b border-slate-100 pb-5">
+          <p className="text-sm font-semibold uppercase tracking-wide text-emerald-700">Campus ride</p>
+          <h1 className="mt-1 text-2xl font-bold text-slate-900 sm:text-3xl">Book a Keke</h1>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Tell us where you are going, choose up to {capacity} seats, and send your request to available drivers.
+          </p>
+        </header>
 
-      <form className="space-y-6" onSubmit={handleSubmit}>
-        <LocationFields label="Pickup" location={pickup} onChange={updateLocation(setPickup)} />
-        <LocationFields label="Destination" location={destination} onChange={updateLocation(setDestination)} />
-
-        <fieldset>
-          <legend className="text-sm font-semibold text-slate-900">Seats</legend>
-          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {[1, 2, 3, 4].map((seatCount) => (
-              <button
-                key={seatCount}
-                aria-pressed={bookedSeats === seatCount}
-                className={`rounded-lg border px-3 py-3 text-left transition ${
-                  bookedSeats === seatCount
-                    ? 'border-emerald-600 bg-emerald-50 text-emerald-900 ring-1 ring-emerald-600'
-                    : 'border-slate-200 text-slate-700 hover:border-emerald-400'
-                }`}
-                onClick={() => setBookedSeats(seatCount)}
-                type="button"
-              >
-                <span className="block font-semibold">{seatCount} {seatCount === 1 ? 'seat' : 'seats'}</span>
-                <span className="mt-1 block text-sm">₦{seatCount * RYDA_CONFIG.RIDE_FARE_PER_SEAT_NGN}</span>
-                {seatCount === 4 && <span className="mt-1 block text-xs font-medium">Private Keke</span>}
-              </button>
-            ))}
+        <form className="mt-6 space-y-6" onSubmit={handleSubmit}>
+          <div className="space-y-5">
+            <LocationFields
+              label="Pickup point"
+              placeholder="e.g. Main Gate"
+              location={pickup}
+              onChange={updateLocation(setPickup)}
+            />
+            <LocationFields
+              label="Destination"
+              placeholder="e.g. Faculty of Engineering"
+              location={destination}
+              onChange={updateLocation(setDestination)}
+            />
           </div>
-        </fieldset>
 
-        <div className="rounded-xl bg-slate-50 p-4">
-          <p className="text-sm text-slate-600">Fare preview</p>
-          <p className="mt-1 text-2xl font-bold text-slate-900">₦{fare}</p>
-          <p className="mt-1 text-xs text-slate-500">Final fare is confirmed by Ryda when your request is created.</p>
-        </div>
+          <fieldset>
+            <legend className="text-sm font-semibold text-slate-900">How many seats do you need?</legend>
+            <p className="mt-1 text-sm text-slate-600">Choose all {capacity} seats to book a private Keke.</p>
+            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {Array.from({ length: capacity }, (_, index) => index + 1).map((seatCount) => (
+                <button
+                  key={seatCount}
+                  aria-pressed={bookedSeats === seatCount}
+                  className={`rounded-xl border px-3 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 ${
+                    bookedSeats === seatCount
+                      ? 'border-emerald-600 bg-emerald-50 text-emerald-900 ring-1 ring-emerald-600'
+                      : 'border-slate-200 text-slate-700 hover:border-emerald-400 hover:bg-emerald-50/50'
+                  }`}
+                  onClick={() => setBookedSeats(seatCount)}
+                  type="button"
+                >
+                  <span className="block font-semibold">
+                    {seatCount} {seatCount === 1 ? 'seat' : 'seats'}
+                  </span>
+                  <span className="mt-1 block text-sm">{formatNaira(seatCount * RYDA_CONFIG.RIDE_FARE_PER_SEAT_NGN)}</span>
+                  {seatCount === capacity && <span className="mt-1 block text-xs font-medium">Private Keke</span>}
+                </button>
+              ))}
+            </div>
+          </fieldset>
 
-        <aside className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950" aria-label="Platform payment notice">
-          <span className="font-semibold">Pay through Ryda</span>
-          <p className="mt-1">{OFF_PLATFORM_PAYMENT_WARNING}</p>
-        </aside>
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-emerald-950">Fare preview</p>
+                <p className="mt-1 text-sm text-emerald-900">
+                  {bookedSeats} {bookedSeats === 1 ? 'seat' : 'seats'} at {formatNaira(RYDA_CONFIG.RIDE_FARE_PER_SEAT_NGN)} each
+                </p>
+              </div>
+              <p className="text-2xl font-bold text-emerald-950">{formatNaira(fare)}</p>
+            </div>
+            {isPrivateRide && (
+              <p className="mt-3 rounded-lg bg-white/70 px-3 py-2 text-sm font-medium text-emerald-900">
+                Private Keke selected: all {capacity} seats are reserved for your trip.
+              </p>
+            )}
+          </div>
 
-        {error && <p className="text-sm font-medium text-red-600" role="alert">{error}</p>}
-        {success && <p className="text-sm font-medium text-emerald-700" role="status">{success}</p>}
+          <aside className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950" aria-label="Platform payment notice">
+            <span className="font-semibold">Pay through Ryda</span>
+            <p className="mt-1">{OFF_PLATFORM_PAYMENT_WARNING}</p>
+          </aside>
 
-        <button className="w-full rounded-lg bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300" disabled={isSubmitting} type="submit">
-          {isSubmitting ? 'Requesting ride…' : 'Request a ride'}
-        </button>
-      </form>
+          <div className="min-h-11" aria-live="polite">
+            {error && (
+              <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700" role="alert">
+                {error}
+              </p>
+            )}
+            {success && (
+              <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800" role="status">
+                {success}
+              </p>
+            )}
+          </div>
+
+          <button
+            className="w-full rounded-lg bg-emerald-600 px-4 py-3 font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-emerald-300"
+            disabled={isSubmitting}
+            type="submit"
+          >
+            {isSubmitting ? 'Sending ride request…' : 'Request a ride'}
+          </button>
+        </form>
+      </div>
     </section>
   );
 }
 
-function LocationFields({ label, location, onChange }) {
+function LocationFields({ label, placeholder, location, onChange }) {
   return (
     <fieldset className="space-y-3">
       <legend className="text-sm font-semibold text-slate-900">{label}</legend>
-      <label className="block text-sm text-slate-700">
+      <label className="block text-sm font-medium text-slate-700">
         Address
-        <input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600" onChange={onChange('address')} required value={location.address} />
+        <input
+          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+          onChange={onChange('address')}
+          placeholder={placeholder}
+          required
+          value={location.address}
+        />
       </label>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <label className="text-sm text-slate-700">
-          Latitude
-          <input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600" inputMode="decimal" onChange={onChange('latitude')} required type="number" value={location.latitude} />
-        </label>
-        <label className="text-sm text-slate-700">
-          Longitude
-          <input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600" inputMode="decimal" onChange={onChange('longitude')} required type="number" value={location.longitude} />
-        </label>
-      </div>
+      <details className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+        <summary className="cursor-pointer text-sm font-medium text-slate-700">
+          Add map coordinates required by the current ride service
+        </summary>
+        <p className="mt-2 text-xs leading-5 text-slate-600">
+          These help drivers locate your pickup and destination. They are required by the existing ride API.
+        </p>
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <label className="text-sm text-slate-700">
+            Latitude
+            <input
+              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+              inputMode="decimal"
+              onChange={onChange('latitude')}
+              step="any"
+              type="number"
+              value={location.latitude}
+            />
+          </label>
+          <label className="text-sm text-slate-700">
+            Longitude
+            <input
+              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+              inputMode="decimal"
+              onChange={onChange('longitude')}
+              step="any"
+              type="number"
+              value={location.longitude}
+            />
+          </label>
+        </div>
+      </details>
     </fieldset>
   );
 }

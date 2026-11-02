@@ -74,13 +74,13 @@ export default function DriverWalletPage() {
   const overdue = eligibility.liabilities.filter((item) => item.status === 'OVERDUE');
 
   return (
-    <section className="space-y-6">
+    <section className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
       <div>
         <h1 className="text-3xl font-bold">Driver wallet</h1>
         <p className="mt-1 text-slate-600">Earnings, outstanding fees, and demo withdrawal requests.</p>
       </div>
 
-      {message && <p className="rounded-lg bg-slate-100 p-3 text-sm">{message}</p>}
+      {message && <p className="rounded-lg bg-slate-100 p-3 text-sm text-slate-700" role="status">{message}</p>}
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Summary label="Available" value={wallet.availableBalance} />
@@ -121,7 +121,7 @@ export default function DriverWalletPage() {
       <section className="rounded-xl bg-white p-5 shadow-sm">
         <h2 className="text-xl font-semibold">Request withdrawal</h2>
         <form className="mt-3 flex flex-wrap gap-2" onSubmit={requestWithdrawal}>
-          <input className="rounded-lg border px-3 py-2" type="number" min="0.01" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="Amount in NGN" required />
+          <input className="min-w-0 flex-1 rounded-lg border px-3 py-2" type="number" min="0.01" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="e.g. 1500" aria-label="Withdrawal amount in Naira" required />
           <button className="rounded-lg bg-slate-900 px-4 py-2 text-white" type="submit">Submit request</button>
         </form>
         <p className="mt-2 text-xs text-slate-500">Demo ledger only; no bank transfer is made.</p>

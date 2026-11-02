@@ -71,14 +71,14 @@ export default function RideHistoryPage() {
   if (error) return <p className="text-red-600" role="alert">{error}</p>;
 
   return (
-    <section className="mx-auto max-w-3xl space-y-6">
+    <section className="mx-auto max-w-3xl space-y-6 p-4 sm:p-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Ride history</h1>
-        <p className="mt-1 text-sm text-slate-600">View completed rides and rate your driver.</p>
+        <p className="mt-1 text-sm text-slate-600">Follow active trips, review previous rides, and rate completed journeys.</p>
       </div>
 
       {rides.length === 0 ? (
-        <p className="rounded-xl bg-white p-5 text-slate-600 ring-1 ring-slate-200">You have no rides yet.</p>
+        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-600"><p className="font-semibold text-slate-800">No rides yet</p><p className="mt-1">Your requested and completed Keke rides will appear here.</p></div>
       ) : (
         <div className="space-y-3">
           {rides.map((ride) => (
@@ -159,7 +159,7 @@ function RideDetails({ ride, accessToken }) {
       <dl className="mt-3 space-y-2 text-sm text-slate-700">
         <div><dt className="font-medium">Pickup</dt><dd>{ride.pickup?.address}</dd></div>
         <div><dt className="font-medium">Destination</dt><dd>{ride.destination?.address}</dd></div>
-        <div><dt className="font-medium">Status</dt><dd>{ride.status}</dd></div>
+        <div><dt className="font-medium">Status</dt><dd className="mt-1"><StatusBadge status={ride.status} /></dd></div>
         <div><dt className="font-medium">Fare</dt><dd>₦{ride.grossFare}</dd></div>
       </dl>
 
@@ -196,7 +196,7 @@ function RideDetails({ ride, accessToken }) {
           </fieldset>
           <label className="block text-sm text-slate-700">
             Comment (optional)
-            <textarea className="mt-1 w-full rounded-lg border border-slate-300 p-2" maxLength="500" onChange={(event) => setComment(event.target.value)} rows="3" value={comment} />
+            <textarea className="mt-1 w-full rounded-lg border border-slate-300 p-2" maxLength="500" onChange={(event) => setComment(event.target.value)} placeholder="Tell us about your ride experience" rows="3" value={comment} />
           </label>
           {message && <p className="text-sm text-slate-700" role="status">{message}</p>}
           <button className="rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white disabled:bg-emerald-300" disabled={isSubmitting} type="submit">{isSubmitting ? 'Submitting…' : 'Submit review'}</button>
@@ -204,4 +204,19 @@ function RideDetails({ ride, accessToken }) {
       )}
     </article>
   );
+}
+
+function StatusBadge({ status }) {
+  const styles = {
+    COMPLETED: 'bg-emerald-50 text-emerald-800',
+    CANCELLED: 'bg-slate-100 text-slate-700',
+    NO_SHOW: 'bg-rose-50 text-rose-800',
+    IN_PROGRESS: 'bg-sky-50 text-sky-800',
+    ACCEPTED: 'bg-indigo-50 text-indigo-800',
+    DRIVER_ARRIVING: 'bg-indigo-50 text-indigo-800',
+    DRIVER_ARRIVED: 'bg-indigo-50 text-indigo-800',
+    REQUESTED: 'bg-amber-50 text-amber-800'
+  };
+
+  return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${styles[status] || 'bg-slate-100 text-slate-700'}`}>{status}</span>;
 }

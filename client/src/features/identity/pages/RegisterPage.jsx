@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import AuthLayout from '../components/AuthLayout';
+import PasswordField from '../components/PasswordField';
 import { useAuth } from '../hooks/AuthContext';
 
 const INITIAL_VALUES = {
@@ -51,12 +52,14 @@ export default function RegisterPage() {
         </>
       }
     >
-      <form className="space-y-4" onSubmit={handleSubmit}>
-        {error && (
-          <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700" role="alert">
-            {error}
-          </p>
-        )}
+      <form className="space-y-5" onSubmit={handleSubmit}>
+        <div className="min-h-11" aria-live="polite">
+          {error && (
+            <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700" role="alert">
+              {error}
+            </p>
+          )}
+        </div>
         <label className="block text-sm font-medium text-slate-700">
           Full name
           <input
@@ -66,6 +69,7 @@ export default function RegisterPage() {
             value={values.fullName}
             onChange={handleChange}
             autoComplete="name"
+            placeholder="e.g. Victor Erhabor"
             required
           />
         </label>
@@ -78,6 +82,7 @@ export default function RegisterPage() {
             value={values.email}
             onChange={handleChange}
             autoComplete="email"
+            placeholder="you@example.com"
             required
           />
         </label>
@@ -90,6 +95,7 @@ export default function RegisterPage() {
             value={values.phone}
             onChange={handleChange}
             autoComplete="tel"
+            placeholder="e.g. 08012345678"
             required
           />
         </label>
@@ -122,20 +128,17 @@ export default function RegisterPage() {
             ))}
           </div>
         </fieldset>
-        <label className="block text-sm font-medium text-slate-700">
-          Password
-          <input
-            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
-            type="password"
-            name="password"
-            value={values.password}
-            onChange={handleChange}
-            autoComplete="new-password"
-            minLength="8"
-            required
-          />
-          <span className="mt-1 block text-xs font-normal text-slate-500">Use at least 8 characters.</span>
-        </label>
+        <PasswordField
+          id="register-password"
+          name="password"
+          value={values.password}
+          onChange={handleChange}
+          autoComplete="new-password"
+          placeholder="At least 8 characters"
+          minLength="8"
+          required
+          helpText="Use at least 8 characters."
+        />
         <button
           className="w-full rounded-lg bg-teal-700 px-4 py-2.5 font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-teal-400"
           type="submit"

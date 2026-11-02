@@ -5,8 +5,7 @@ import { CourierLiveTracking } from './CourierTracking.jsx';
 
 const initialForm = {
   recipientName: '', recipientPhone: '', packageDescription: '',
-  pickupAddress: '', pickupLatitude: '', pickupLongitude: '',
-  dropoffAddress: '', dropoffLatitude: '', dropoffLongitude: ''
+  pickupAddress: '', dropoffAddress: ''
 };
 
 function apiError(error, fallback) {
@@ -18,11 +17,7 @@ function naira(value) {
 }
 
 function validLocation(value, label) {
-  const latitude = Number(value.latitude);
-  const longitude = Number(value.longitude);
   if (!value.address.trim()) return `${label} address is required.`;
-  if (String(value.latitude).trim() === '' || !Number.isFinite(latitude) || latitude < -90 || latitude > 90) return `${label} latitude must be between -90 and 90.`;
-  if (String(value.longitude).trim() === '' || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) return `${label} longitude must be between -180 and 180.`;
   return null;
 }
 
@@ -48,8 +43,8 @@ export function CourierCreateForm({ onCreated }) {
     const required = [
       ['recipientName', 'Recipient name'], ['recipientPhone', 'Recipient phone'], ['packageDescription', 'Package description']
     ].find(([field]) => !form[field].trim());
-    const locationError = validLocation({ address: form.pickupAddress, latitude: form.pickupLatitude, longitude: form.pickupLongitude }, 'Pickup')
-      || validLocation({ address: form.dropoffAddress, latitude: form.dropoffLatitude, longitude: form.dropoffLongitude }, 'Drop-off');
+    const locationError = validLocation({ address: form.pickupAddress }, 'Pickup')
+      || validLocation({ address: form.dropoffAddress }, 'Drop-off');
     if (required || locationError) {
       setError(required ? `${required[1]} is required.` : locationError);
       return;
@@ -59,8 +54,8 @@ export function CourierCreateForm({ onCreated }) {
       recipientName: form.recipientName.trim(),
       recipientPhone: form.recipientPhone.trim(),
       packageDescription: form.packageDescription.trim(),
-      pickup: { address: form.pickupAddress.trim(), latitude: Number(form.pickupLatitude), longitude: Number(form.pickupLongitude) },
-      dropoff: { address: form.dropoffAddress.trim(), latitude: Number(form.dropoffLatitude), longitude: Number(form.dropoffLongitude) }
+      pickup: { address: form.pickupAddress.trim() },
+      dropoff: { address: form.dropoffAddress.trim() }
     };
 
     setSubmitting(true);
@@ -80,38 +75,32 @@ export function CourierCreateForm({ onCreated }) {
     <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <h2 className="text-xl font-bold">Send a package or document</h2>
       <p className="mt-1 text-sm text-slate-600">Courier fare: <span className="font-semibold text-slate-900">{naira(RYDA_CONFIG.COURIER_FARE_NGN)}</span></p>
-      <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">For your safety and transaction traceability, make payments only through RYDA. Payments made outside RYDA cannot be verified through our platform and are not covered by RYDA payment records or dispute support.</p>
+      <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">For your safety and transaction traceability, make payments only through Ryda. Payments made outside Ryda cannot be verified through our platform and are not covered by Ryda payment records or dispute support.</p>
       {error && <p role="alert" className="mt-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
       {success && <p role="status" className="mt-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{success}</p>}
       <form className="mt-5 space-y-5" onSubmit={submit} noValidate>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Recipient name" name="recipientName" value={form.recipientName} onChange={update} />
-          <Field label="Recipient phone" name="recipientPhone" value={form.recipientPhone} onChange={update} />
+          <Field label="Recipient name" name="recipientName" value={form.recipientName} onChange={update} placeholder="e.g. Ada Okafor" />
+          <Field label="Recipient phone" name="recipientPhone" value={form.recipientPhone} onChange={update} placeholder="e.g. 08012345678" />
         </div>
-        <label className="block text-sm font-medium text-slate-800">Package description<textarea name="packageDescription" value={form.packageDescription} onChange={update} rows="3" className="mt-1 w-full rounded-lg border border-slate-300 p-2" /></label>
-        <LocationFields title="Pickup" prefix="pickup" form={form} onChange={update} />
-        <LocationFields title="Drop-off" prefix="dropoff" form={form} onChange={update} />
+        <label className="block text-sm font-medium text-slate-800">Package description<textarea name="packageDescription" value={form.packageDescription} onChange={update} rows="3" placeholder="e.g. Document envelope" className="mt-1 w-full rounded-lg border border-slate-300 p-2" /></label>
+        <LocationFields title="Pickup" prefix="pickup" form={form} onChange={update} placeholder="e.g. School Library entrance" />
+        <LocationFields title="Drop-off" prefix="dropoff" form={form} onChange={update} placeholder="e.g. Hostel Block B" />
         <button type="submit" disabled={submitting} className="rounded-lg bg-indigo-700 px-4 py-3 font-semibold text-white hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-60">{submitting ? 'Creating courier request…' : 'Create courier request'}</button>
       </form>
     </section>
   );
 }
 
-function Field({ label, name, value, onChange, type = 'text', min, max, step }) {
-  return <label className="block text-sm font-medium text-slate-800">{label}<input required type={type} name={name} value={value} onChange={onChange} min={min} max={max} step={step} className="mt-1 w-full rounded-lg border border-slate-300 p-2" /></label>;
+function Field({ label, name, value, onChange, type = 'text', placeholder }) {
+  return <label className="block text-sm font-medium text-slate-800">{label}<input required type={type} name={name} value={value} onChange={onChange} placeholder={placeholder} className="mt-1 w-full rounded-lg border border-slate-300 p-2" /></label>;
 }
 
-function LocationFields({ title, prefix, form, onChange }) {
-  const titleCase = `${prefix[0].toUpperCase()}${prefix.slice(1)}`;
+function LocationFields({ title, prefix, form, onChange, placeholder }) {
   return (
     <fieldset className="rounded-lg border border-slate-200 p-4">
       <legend className="px-1 text-sm font-semibold text-slate-800">{title}</legend>
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="sm:col-span-3"><Field label="Address" name={`${prefix}Address`} value={form[`${prefix}Address`]} onChange={onChange} /></div>
-        <Field label="Latitude" type="number" name={`${prefix}Latitude`} value={form[`${prefix}Latitude`]} onChange={onChange} min="-90" max="90" step="any" />
-        <Field label="Longitude" type="number" name={`${prefix}Longitude`} value={form[`${prefix}Longitude`]} onChange={onChange} min="-180" max="180" step="any" />
-      </div>
-      <p className="mt-2 text-xs text-slate-500">Enter {titleCase.toLowerCase()} coordinates for the campus location.</p>
+      <Field label="Address" name={`${prefix}Address`} value={form[`${prefix}Address`]} onChange={onChange} placeholder={placeholder} />
     </fieldset>
   );
 }

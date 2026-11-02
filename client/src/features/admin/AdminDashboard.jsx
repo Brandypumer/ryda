@@ -64,13 +64,16 @@ export default function AdminDashboard() {
   const overdueLiabilities = data.liabilities.filter((liability) => liability.status === 'OVERDUE');
 
   return (
-    <section className="space-y-6">
-      <header>
+    <section className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
+      <header className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+        <div>
         <h1 className="text-3xl font-bold">Admin dashboard</h1>
         <p className="mt-1 text-slate-600">Review platform activity and demo ledger actions.</p>
+        </div>
+        <button type="button" onClick={loadDashboard} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50">Refresh data</button>
       </header>
 
-      {message && <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{message}</p>}
+      {message && <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700" role="alert">{message}</p>}
 
       <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {Object.entries(data.totals).map(([key, value]) => <Metric key={key} label={key} value={value} />)}
@@ -82,7 +85,7 @@ export default function AdminDashboard() {
             <tr key={driver._id}>
               <Cell>{driver.userId?.fullName || driver.userId?.email || driver.userId || '—'}</Cell>
               <Cell>{driver.vehicleNumber || '—'}</Cell>
-              <Cell>{driver.verificationStatus}</Cell>
+              <Cell><StatusBadge status={driver.verificationStatus} /></Cell>
               <Cell>
                 <ActionButton disabled={busy === driver._id} onClick={() => runAction(driver._id, () => api.patch(`/admin/drivers/${driver._id}/verification`, { verificationStatus: 'APPROVED' }))}>Approve</ActionButton>{' '}
                 <ActionButton tone="danger" disabled={busy === driver._id} onClick={() => runAction(driver._id, () => api.patch(`/admin/drivers/${driver._id}/verification`, { verificationStatus: 'REJECTED' }))}>Reject</ActionButton>
@@ -97,8 +100,8 @@ export default function AdminDashboard() {
           {data.drivers.map((driver) => (
             <tr key={driver._id}>
               <Cell>{driver.userId?.fullName || driver.userId?.email || driver.userId || '—'}</Cell>
-              <Cell>{driver.verificationStatus}</Cell>
-              <Cell>{driver.isSuspended ? 'Suspended' : 'Active'}</Cell>
+              <Cell><StatusBadge status={driver.verificationStatus} /></Cell>
+              <Cell><StatusBadge status={driver.isSuspended ? 'SUSPENDED' : 'ACTIVE'} /></Cell>
               <Cell><ActionButton disabled={busy === `suspend-${driver._id}`} onClick={() => runAction(`suspend-${driver._id}`, () => api.patch(`/admin/drivers/${driver._id}/suspension`, { isSuspended: !driver.isSuspended }))}>{driver.isSuspended ? 'Reactivate' : 'Suspend'}</ActionButton></Cell>
             </tr>
           ))}
@@ -107,7 +110,7 @@ export default function AdminDashboard() {
 
       <Panel title={`Overdue liabilities (${overdueLiabilities.length})`}>
         <Table headers={['Driver', 'Service', 'Amount', 'Status']}>
-          {overdueLiabilities.map((liability) => <tr key={liability._id}><Cell>{String(liability.driverId)}</Cell><Cell>{liability.serviceType}</Cell><Cell>{naira.format(liability.amount)}</Cell><Cell>{liability.status}</Cell></tr>)}
+          {overdueLiabilities.map((liability) => <tr key={liability._id}><Cell>{String(liability.driverId)}</Cell><Cell>{liability.serviceType}</Cell><Cell>{naira.format(liability.amount)}</Cell><Cell><StatusBadge status={liability.status} /></Cell></tr>)}
         </Table>
       </Panel>
 
@@ -117,7 +120,7 @@ export default function AdminDashboard() {
             <tr key={withdrawal._id}>
               <Cell>{withdrawal.driverId?.fullName || withdrawal.driverId?.email || String(withdrawal.driverId)}</Cell>
               <Cell>{naira.format(withdrawal.amount)}</Cell>
-              <Cell>{withdrawal.status}</Cell>
+              <Cell><StatusBadge status={withdrawal.status} /></Cell>
               <Cell>
                 {withdrawal.status === 'PENDING' && <>
                   <ActionButton disabled={busy === withdrawal._id} onClick={() => runAction(withdrawal._id, () => api.patch(`/admin/withdrawals/${withdrawal._id}`, { status: 'APPROVED' }))}>Approve</ActionButton>{' '}
@@ -144,6 +147,20 @@ export default function AdminDashboard() {
 
 function Metric({ label, value }) {
   return <div className="rounded-xl bg-white p-4 shadow-sm"><p className="text-xs uppercase text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold">{value ?? 0}</p></div>;
+}
+
+function StatusBadge({ status }) {
+  const styles = {
+    APPROVED: 'bg-emerald-50 text-emerald-800',
+    PAID: 'bg-emerald-50 text-emerald-800',
+    ACTIVE: 'bg-emerald-50 text-emerald-800',
+    PENDING: 'bg-amber-50 text-amber-800',
+    OVERDUE: 'bg-rose-50 text-rose-800',
+    REJECTED: 'bg-rose-50 text-rose-800',
+    SUSPENDED: 'bg-rose-50 text-rose-800'
+  };
+
+  return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${styles[status] || 'bg-slate-100 text-slate-700'}`}>{status || 'UNKNOWN'}</span>;
 }
 
 function Panel({ title, children }) {

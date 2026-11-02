@@ -176,12 +176,14 @@ export default function DriverVerificationPage() {
       title="Verify your Keke"
       subtitle="Submit your vehicle details for review. You must wait for admin approval before going online."
     >
-      <form className="space-y-4" onSubmit={handleSubmit}>
-        {error && (
-          <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700" role="alert">
-            {error}
-          </p>
-        )}
+      <form className="space-y-5" onSubmit={handleSubmit}>
+        <div className="min-h-11" aria-live="polite">
+          {error && (
+            <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700" role="alert">
+              {error}
+            </p>
+          )}
+        </div>
         <label className="block text-sm font-medium text-slate-700">
           Vehicle number
           <input
@@ -190,6 +192,7 @@ export default function DriverVerificationPage() {
             name="vehicleNumber"
             value={values.vehicleNumber}
             onChange={handleChange}
+            placeholder="e.g. KJA-123-AB"
             required
           />
         </label>
@@ -222,7 +225,7 @@ export default function DriverVerificationPage() {
           {identityDocumentFile && <span className="mt-1 block text-xs font-normal text-slate-500">Selected: {identityDocumentFile.name}</span>}
         </label>
         <p className="rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-600">
-          Images and documents must be JPEG, PNG, or WebP for the Keke image; the identity document may also be a PDF. Each file must be 5 MB or smaller. Ryda will store Cloudinary URLs only, never your file bytes.
+          Upload a clear Keke image and identity document. Images and documents must be JPEG, PNG, or WebP for the Keke image; the identity document may also be a PDF. Each file must be 5 MB or smaller. Ryda stores Cloudinary URLs only, never your file bytes. Admin approval is required before you can go online.
         </p>
         <button
           className="w-full rounded-lg bg-teal-700 px-4 py-2.5 font-semibold text-white hover:bg-teal-800"

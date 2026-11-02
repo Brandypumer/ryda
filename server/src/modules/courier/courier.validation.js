@@ -21,11 +21,23 @@ function location(value, label) {
     throw new AppError(`${label} is required.`, 400);
   }
 
-  return {
-    address: requiredText(value.address, `${label} address`),
-    latitude: coordinate(value.latitude, `${label} latitude`, -90, 90),
-    longitude: coordinate(value.longitude, `${label} longitude`, -180, 180)
+  const hasLatitude = value.latitude !== undefined;
+  const hasLongitude = value.longitude !== undefined;
+
+  if (hasLatitude !== hasLongitude) {
+    throw new AppError(`${label} latitude and longitude must be supplied together.`, 400);
+  }
+
+  const normalizedLocation = {
+    address: requiredText(value.address, `${label} address`)
   };
+
+  if (hasLatitude) {
+    normalizedLocation.latitude = coordinate(value.latitude, `${label} latitude`, -90, 90);
+    normalizedLocation.longitude = coordinate(value.longitude, `${label} longitude`, -180, 180);
+  }
+
+  return normalizedLocation;
 }
 
 export function validateCourierInput(input = {}) {

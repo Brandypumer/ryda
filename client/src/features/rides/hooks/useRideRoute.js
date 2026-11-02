@@ -39,7 +39,7 @@ export function useRideRoute(pickup, destination) {
 
     async function loadRoute() {
       try {
-        const response = await fetch('https://api.openrouteservice.org/v2/directions/driving-car/geojson', {
+        const response = await fetch('https://api.heigit.org/openrouteservice/v2/directions/driving-car/geojson', {
           method: 'POST',
           headers: {
             Authorization: apiKey,

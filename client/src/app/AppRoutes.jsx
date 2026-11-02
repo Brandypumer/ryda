@@ -5,15 +5,8 @@ import { DriverVerificationPage, LoginPage, ProfilePage, RegisterPage } from '..
 import { RideBookingPage, RideHistoryPage } from '../features/rides';
 import CourierSenderPage from '../features/courier/CourierSenderPage';
 import DriverDashboardPage from '../features/driver-ops/DriverDashboardPage';
-
-function Home() {
-  return (
-    <section>
-      <h1 className="text-3xl font-bold">Ryda</h1>
-      <p className="mt-2 text-slate-600">Campus Keke rides and courier delivery.</p>
-    </section>
-  );
-}
+import LandingPage from '../features/public/LandingPage';
+import { AboutPage, HelpPage, HowItWorksPage, PrivacyPage, SafetyPage, TermsPage } from '../features/public/PublicPages';
 
 function Placeholder({ title }) {
   return <h1 className="text-2xl font-semibold">{title} is coming soon.</h1>;
@@ -22,7 +15,13 @@ function Placeholder({ title }) {
 export default function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<Home />} />
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/about" element={<AboutPage />} />
+      <Route path="/how-it-works" element={<HowItWorksPage />} />
+      <Route path="/safety" element={<SafetyPage />} />
+      <Route path="/help" element={<HelpPage />} />
+      <Route path="/privacy" element={<PrivacyPage />} />
+      <Route path="/terms" element={<TermsPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/profile" element={<ProfilePage />} />

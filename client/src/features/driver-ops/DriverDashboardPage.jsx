@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../shared/lib/api.js';
 import { useAuth } from '../identity';
-import { DriverRideLocationPublisher } from '../rides';
+import { DriverRideLocationPublisher, DriverRideTrackingMap } from '../rides';
 import { CourierDriverLocationPublisher } from '../courier/CourierTracking.jsx';
 
 function getErrorMessage(error, fallback) {
@@ -146,6 +146,7 @@ export default function DriverDashboardPage() {
   const [error, setError] = useState('');
   const [requestError, setRequestError] = useState('');
   const [feedback, setFeedback] = useState('');
+  const [driverLocation, setDriverLocation] = useState(null);
 
   const loadRequests = useCallback(async () => {
     setRequestLoading(true);
@@ -180,6 +181,12 @@ export default function DriverDashboardPage() {
   }, [loadRequests]);
 
   useEffect(() => { loadDashboard(); }, [loadDashboard]);
+
+  useEffect(() => {
+    setDriverLocation(null);
+  }, [dashboard?.activeAssignment?.id]);
+
+  const updateDriverLocation = useCallback((location) => setDriverLocation(location), []);
 
   const blockedMessage = useMemo(() => eligibilityMessage(dashboard), [dashboard]);
 
@@ -269,7 +276,24 @@ export default function DriverDashboardPage() {
           <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold">Active assignment</h2><p className="mt-1 text-sm text-slate-600">Only your current Ride or Courier delivery is shown here.</p></div></div>
           <ActiveAssignmentCard assignment={dashboard.activeAssignment} />
           {dashboard.assignmentConflict && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">This driver has conflicting active assignments. Complete or resolve one before accepting another request.</p>}
-          {dashboard.activeAssignment?.serviceType === 'RIDE' && <DriverRideLocationPublisher ride={{ _id: dashboard.activeAssignment.id, status: dashboard.activeAssignment.status, driverId: user?.id }} accessToken={token} isAssignedDriver />}
+          {dashboard.activeAssignment?.serviceType === 'RIDE' && <>
+            <DriverRideLocationPublisher
+              ride={{ _id: dashboard.activeAssignment.id, status: dashboard.activeAssignment.status, driverId: user?.id }}
+              accessToken={token}
+              isAssignedDriver
+              onLocationChange={updateDriverLocation}
+            />
+            <DriverRideTrackingMap
+              ride={{
+                _id: dashboard.activeAssignment.id,
+                status: dashboard.activeAssignment.status,
+                pickup: dashboard.activeAssignment.pickup,
+                destination: dashboard.activeAssignment.dropoff
+              }}
+              accessToken={token}
+              driverLocation={driverLocation}
+            />
+          </>}
           {dashboard.activeAssignment?.serviceType === 'COURIER' && <CourierDriverLocationPublisher courier={{ _id: dashboard.activeAssignment.id, status: dashboard.activeAssignment.status, driverId: user?.id }} currentUserId={user?.id} />}
         </section>
 

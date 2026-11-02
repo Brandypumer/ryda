@@ -9,7 +9,7 @@ const ACTIVE_TRACKING_STATUSES = new Set([
   'IN_PROGRESS'
 ]);
 
-export function useDriverRideLocationPublisher({ ride, accessToken, isAssignedDriver }) {
+export function useDriverRideLocationPublisher({ ride, accessToken, isAssignedDriver, onLocationChange }) {
   const [error, setError] = useState('');
   const [trackingStatus, setTrackingStatus] = useState(ride?.status);
   const isActiveRide = Boolean(ride?._id && isAssignedDriver && ACTIVE_TRACKING_STATUSES.has(trackingStatus));
@@ -40,9 +40,13 @@ export function useDriverRideLocationPublisher({ ride, accessToken, isAssignedDr
 
     const watchId = navigator.geolocation.watchPosition(
       ({ coords }) => {
+        const location = { latitude: Number(coords.latitude), longitude: Number(coords.longitude) };
+        if (!Number.isFinite(location.latitude) || !Number.isFinite(location.longitude)) return;
+
+        onLocationChange?.(location);
         socket.emit(
           'driver:location:update',
-          { rideId: ride._id, latitude: coords.latitude, longitude: coords.longitude },
+          { rideId: ride._id, ...location },
           (result) => {
             if (!result?.ok) setError(result?.message || 'Unable to share your current location.');
             else setError('');
@@ -66,7 +70,7 @@ export function useDriverRideLocationPublisher({ ride, accessToken, isAssignedDr
       socket.off('connect', joinRideRoom);
       socket.off('ride:status:update', updateStatus);
     };
-  }, [accessToken, isActiveRide, ride?._id]);
+  }, [accessToken, isActiveRide, onLocationChange, ride?._id]);
 
   return { locationError: error, isTracking: isActiveRide && !error };
 }

@@ -83,6 +83,40 @@ export function registerRideTrackingSocket(io) {
         acknowledge({ ok: false, message: error.message });
       }
     });
+
+    socket.on('rider:location:update', async (payload = {}, acknowledge = () => {}) => {
+      try {
+        const user = authenticateSocket(socket);
+        const { rideId, latitude, longitude } = payload;
+
+        if (user.role !== 'RIDER') {
+          throw new Error('Only riders can publish rider locations.');
+        }
+
+        validateLocationPayload(rideId, latitude, longitude);
+        const ride = await findRide(rideId);
+
+        if (ride.riderId?.toString() !== user.id) {
+          throw new Error('You are not the rider for this ride.');
+        }
+
+        if (!isRideTrackingActive(ride.status)) {
+          throw new Error('Location tracking is not active for this ride.');
+        }
+
+        const location = {
+          rideId,
+          latitude: Number(latitude),
+          longitude: Number(longitude),
+          timestamp: new Date().toISOString()
+        };
+
+        io.to(rideRoom(rideId)).emit('ride:rider-location:update', location);
+        acknowledge({ ok: true, location });
+      } catch (error) {
+        acknowledge({ ok: false, message: error.message });
+      }
+    });
   });
 }
 

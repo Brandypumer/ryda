@@ -6,7 +6,7 @@ import { RideBookingPage, RideHistoryPage } from '../features/rides';
 import CourierSenderPage from '../features/courier/CourierSenderPage';
 import DriverDashboardPage from '../features/driver-ops/DriverDashboardPage';
 import LandingPage from '../features/public/LandingPage';
-import { AboutPage, HelpPage, HowItWorksPage, PrivacyPage, SafetyPage, TermsPage } from '../features/public/PublicPages';
+import { AboutPage, ContactPage, HelpPage, HowItWorksPage, PrivacyPage, SafetyPage, TermsPage } from '../features/public/PublicPages';
 
 function Placeholder({ title }) {
   return <h1 className="text-2xl font-semibold">{title} is coming soon.</h1>;
@@ -17,6 +17,7 @@ export default function AppRoutes() {
     <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/about" element={<AboutPage />} />
+      <Route path="/contact" element={<ContactPage />} />
       <Route path="/how-it-works" element={<HowItWorksPage />} />
       <Route path="/safety" element={<SafetyPage />} />
       <Route path="/help" element={<HelpPage />} />

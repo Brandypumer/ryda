@@ -6,7 +6,7 @@ const paymentWarning = 'For your safety and transaction traceability, make payme
 
 const serviceCards = [
   {
-    icon: 'route',
+    icon: 'keke',
     title: 'Campus Keke rides',
     description: 'Request a Keke for your campus trip, choose the seats you need, and follow the ride once a driver accepts.'
   },
@@ -20,6 +20,9 @@ const serviceCards = [
 function Icon({ name, className = '' }) {
   const common = { className, fill: 'none', stroke: 'currentColor', strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: 1.8, viewBox: '0 0 24 24', 'aria-hidden': true };
 
+  if (name === 'keke') {
+    return <svg {...common}><path d="M5 16h14l-1.5-6h-11L5 16Z" /><path d="M7 10V7h10v3M9 16v3M15 16v3" /><circle cx="8" cy="17" r="1.5" /><circle cx="16" cy="17" r="1.5" /></svg>;
+  }
   if (name === 'route') {
     return <svg {...common}><path d="M5 18c4-1 3-10 8-10 3 0 3 4 6 4" /><path d="M17 9l2 3-3 1" /><circle cx="5" cy="18" r="1.5" /><circle cx="13" cy="8" r="1.5" /></svg>;
   }
@@ -30,10 +33,10 @@ function Icon({ name, className = '' }) {
     return <svg {...common}><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z" /><circle cx="12" cy="10" r="2.5" /></svg>;
   }
   if (name === 'seats') {
-    return <svg {...common}><path d="M7 11V7a3 3 0 0 1 6 0v4" /><path d="M5 19v-4a4 4 0 0 1 8 0v4" /><path d="M3 19h12" /><path d="M17 5v14" /><path d="M21 9v10" /></svg>;
+    return <svg {...common}><path d="M6 11V7a3 3 0 0 1 6 0v4" /><path d="M5 11h8a3 3 0 0 1 3 3v4H5v-7Z" /><path d="M5 18v2M16 18v2" /></svg>;
   }
   if (name === 'track') {
-    return <svg {...common}><path d="M12 21a9 9 0 1 0-9-9" /><path d="M12 7v5l3 2" /><path d="M3 16v5h5" /></svg>;
+    return <svg {...common}><path d="m4 12 16-8-8 16-2-6-6-2Z" /><path d="m10 14 4-4" /></svg>;
   }
   if (name === 'check') {
     return <svg {...common}><path d="m5 12 4 4L19 6" /></svg>;

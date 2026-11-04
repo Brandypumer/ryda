@@ -27,19 +27,46 @@ function BulletList({ children }) {
 
 export function AboutPage() {
   return (
-    <PageIntro description="RYDA is a focused campus mobility MVP for Keke rides and point-to-point package or document delivery." eyebrow="About RYDA" title="Built around everyday campus movement.">
-      <ContentSection title="What RYDA supports">
-        <p>RYDA brings two common campus needs into one web application: booking one to four seats in a Keke and arranging a simple delivery within the same campus.</p>
+    <PageIntro description="RYDA is a focused campus mobility platform for Keke rides and intra-campus package or document delivery." eyebrow="About RYDA" title="Moving campus, made simpler.">
+      <ContentSection title="Our purpose">
+        <p>RYDA brings everyday campus movement into one clear web application: book a Keke when you need to travel, or arrange a simple delivery within the same campus.</p>
         <BulletList>
           <li>Campus Keke rides at a fixed ₦150 per seat.</li>
           <li>Private Keke bookings when all four seats are selected.</li>
           <li>Point-to-point campus delivery for an existing package or document at a fixed ₦150 fare.</li>
         </BulletList>
       </ContentSection>
-      <ContentSection title="How the MVP is designed">
-        <p>RYDA uses authenticated accounts, a driver verification workflow, in-platform payment records, and active-service tracking where available. It is intentionally limited to a single-campus operating model for the MVP.</p>
+      <ContentSection title="How RYDA works">
+        <p>Riders add their pickup and destination, choose the seats they need, and follow an accepted ride. Drivers complete verification before receiving requests. Payment records and service status stay visible in the platform.</p>
+      </ContentSection>
+      <ContentSection title="For riders and drivers">
+        <p>Riders get a straightforward booking flow for campus trips. Approved drivers can receive eligible ride and courier requests while they are available.</p>
+      </ContentSection>
+      <ContentSection title="Campus delivery">
+        <p>The courier flow is designed for an existing package or document moving between campus locations, with recipient and pickup details recorded in the request.</p>
+      </ContentSection>
+      <ContentSection title="Safety and payments">
+        <p>RYDA uses authenticated accounts, driver verification, active-service tracking where available, and in-platform payment records. It is intentionally limited to a single-campus MVP and does not claim emergency response or guaranteed availability.</p>
       </ContentSection>
       <Link className="inline-flex rounded-lg bg-ryda-700 px-5 py-3 text-sm font-semibold text-white hover:bg-ryda-800" to="/register">Get started with RYDA</Link>
+    </PageIntro>
+  );
+}
+
+export function ContactPage() {
+  return (
+    <PageIntro description="Need help with a ride, delivery, driver account, payment, or general question? Send us a message." eyebrow="Contact us" title="Contact RYDA">
+      <form className="app-card space-y-5 p-5 sm:p-7">
+        <div className="grid gap-5 sm:grid-cols-2">
+          <label className="text-sm font-medium text-slate-700">Full name<input autoComplete="name" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-slate-900 focus:border-ryda-600 focus:outline-none focus:ring-2 focus:ring-ryda-100" name="name" placeholder="Your full name" required /></label>
+          <label className="text-sm font-medium text-slate-700">Email<input autoComplete="email" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-slate-900 focus:border-ryda-600 focus:outline-none focus:ring-2 focus:ring-ryda-100" name="email" placeholder="you@example.com" required type="email" /></label>
+        </div>
+        <label className="block text-sm font-medium text-slate-700">Category<select className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-slate-900 focus:border-ryda-600 focus:outline-none focus:ring-2 focus:ring-ryda-100" name="category"><option>Ride support</option><option>Delivery support</option><option>Driver support</option><option>Payment support</option><option>General enquiry</option></select></label>
+        <label className="block text-sm font-medium text-slate-700">Subject<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-slate-900 focus:border-ryda-600 focus:outline-none focus:ring-2 focus:ring-ryda-100" name="subject" placeholder="How can we help?" required /></label>
+        <label className="block text-sm font-medium text-slate-700">Message<textarea className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-slate-900 focus:border-ryda-600 focus:outline-none focus:ring-2 focus:ring-ryda-100" name="message" placeholder="Tell us what you need help with" required rows="5" /></label>
+        <p className="rounded-lg bg-amber-50 p-3 text-sm leading-6 text-amber-900">Contact form delivery is not connected yet, so this form does not send a message. Please use the support channel provided by your campus or project administrator.</p>
+        <button className="rounded-lg bg-slate-300 px-5 py-3 text-sm font-semibold text-slate-600" disabled type="submit">Send message (not connected)</button>
+      </form>
     </PageIntro>
   );
 }

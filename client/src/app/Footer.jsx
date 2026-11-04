@@ -3,7 +3,7 @@ import { BrandMark } from '../shared/ui';
 
 const footerGroups = [
   { title: 'Explore', links: [{ to: '/about', label: 'About RYDA' }, { to: '/how-it-works', label: 'How it works' }, { to: '/safety', label: 'Safety' }] },
-  { title: 'Support', links: [{ to: '/help', label: 'Help & FAQ' }, { to: '/register', label: 'Create an account' }, { to: '/login', label: 'Log in' }] },
+  { title: 'Support', links: [{ to: '/help', label: 'Help & FAQ' }, { to: '/contact', label: 'Contact us' }, { to: '/register', label: 'Create an account' }, { to: '/login', label: 'Log in' }] },
   { title: 'Legal', links: [{ to: '/privacy', label: 'Privacy' }, { to: '/terms', label: 'Terms of use' }] }
 ];
 

@@ -7,7 +7,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../features/identity';
 import { getRoleDestination } from '../features/identity/roleDestination';
 
-const publicPaths = new Set(['/', '/about', '/how-it-works', '/safety', '/help', '/privacy', '/terms', '/login', '/register']);
+const publicPaths = new Set(['/', '/about', '/how-it-works', '/safety', '/help', '/contact', '/privacy', '/terms', '/login', '/register']);
 
 export default function App() {
   const { isAuthenticated, isRestoring, user } = useAuth();

@@ -6,8 +6,10 @@ import { BrandMark } from '../../shared/ui';
 const publicLinks = [
   { to: '/', label: 'Home' },
   { to: '/how-it-works', label: 'How it works' },
+  { to: '/about', label: 'About' },
   { to: '/safety', label: 'Safety' },
-  { to: '/help', label: 'Help' }
+  { to: '/help', label: 'Help' },
+  { to: '/contact', label: 'Contact us' }
 ];
 
 const roleLinks = {
@@ -51,13 +53,14 @@ function AppNavLink({ link, onNavigate, mobile = false }) {
 
 function PublicNavLink({ link, onNavigate, mobile = false }) {
   return (
-    <Link
-      className={`${mobile ? 'block rounded-lg px-3 py-2.5' : 'py-2'} text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950`}
+    <NavLink
+      end={link.to === '/'}
+      className={({ isActive }) => `${mobile ? 'block rounded-lg px-3 py-2.5' : 'py-2'} text-sm font-medium transition-colors ${isActive ? 'text-ryda-800' : 'text-slate-700 hover:text-slate-950'} hover:bg-slate-50`}
       onClick={onNavigate}
       to={link.to}
     >
       {link.label}
-    </Link>
+    </NavLink>
   );
 }
 
@@ -75,7 +78,7 @@ export default function Navigation() {
             <BrandMark />
           </NavLink>
 
-          <div className="hidden items-center gap-1 lg:flex">
+          <div className="hidden items-center gap-5 lg:flex">
             {isAuthenticated
               ? links.map((link) => <AppNavLink key={link.to} link={link} />)
               : links.map((link) => <PublicNavLink key={link.to} link={link} />)}

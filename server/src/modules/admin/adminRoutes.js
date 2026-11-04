@@ -10,6 +10,7 @@ import {
   review,
   rides,
   suspendDriver,
+  suspendUser,
   users,
   verifyDriver,
   withdrawals
@@ -20,6 +21,7 @@ const router = Router();
 router.use(requireAuth, requireRole('ADMIN'));
 router.get('/dashboard', dashboard);
 router.get('/users', users);
+router.patch('/users/:id/suspension', suspendUser);
 router.get('/drivers', drivers);
 router.patch('/drivers/:id/verification', verifyDriver);
 router.patch('/drivers/:id/suspension', suspendDriver);

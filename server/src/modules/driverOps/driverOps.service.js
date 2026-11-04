@@ -100,7 +100,13 @@ function assignment(serviceType, item) {
     status: item.status,
     pickup: item.pickup,
     dropoff: item.destination || item.dropoff,
-    acceptedAt: item.acceptedAt
+    acceptedAt: item.acceptedAt,
+    ...(serviceType === 'RIDE' ? {
+      riderId: item.riderId,
+      bookedSeats: item.bookedSeats,
+      grossFare: item.grossFare,
+      paymentStatus: item.paymentStatus
+    } : {})
   };
 }
 

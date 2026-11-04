@@ -20,6 +20,7 @@ export async function authenticateUser({ email, password }) {
   if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
     throw new AppError('Invalid email or password.', 401);
   }
+  if (user.isSuspended) throw new AppError('Your account has been suspended.', 403);
 
   return user;
 }

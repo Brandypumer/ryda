@@ -7,6 +7,7 @@ import {
   listWithdrawals,
   reviewWithdrawal,
   updateDriverSuspension,
+  updateUserSuspension,
   updateDriverVerification
 } from '../services/adminService.js';
 
@@ -33,6 +34,13 @@ export async function suspendDriver(request, response, next) {
   try {
     const driver = await updateDriverSuspension(request.params.id, request.body.isSuspended);
     return response.status(200).json({ driver });
+  } catch (error) { return next(error); }
+}
+
+export async function suspendUser(request, response, next) {
+  try {
+    const user = await updateUserSuspension(request.params.id, request.body.suspended);
+    return response.status(200).json({ user });
   } catch (error) { return next(error); }
 }
 

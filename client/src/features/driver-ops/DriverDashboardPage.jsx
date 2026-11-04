@@ -81,6 +81,34 @@ export function ActiveAssignmentCard({ assignment }) {
   );
 }
 
+const RIDE_NEXT_ACTIONS = {
+  ACCEPTED: ['DRIVER_ARRIVING', 'Start heading to pickup'],
+  DRIVER_ARRIVING: ['DRIVER_ARRIVED', "I've arrived"],
+  DRIVER_ARRIVED: ['IN_PROGRESS', 'Start ride'],
+  IN_PROGRESS: ['COMPLETED', 'Complete ride']
+};
+
+export function ActiveRideControls({ assignment, onUpdated }) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  if (!assignment || assignment.serviceType !== 'RIDE') return null;
+  const action = RIDE_NEXT_ACTIONS[assignment.status];
+  if (!action) return null;
+  async function advanceRide() {
+    setIsSubmitting(true);
+    setError('');
+    try {
+      const response = await api.patch(`/rides/${assignment.id}/status`, { status: action[0] });
+      onUpdated(response.data?.ride);
+    } catch (requestError) {
+      setError(getErrorMessage(requestError, 'Unable to update the ride status.'));
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+  return <div className="rounded-lg border border-indigo-200 bg-white p-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-semibold text-slate-900">Active Ride</p><p className="mt-1 text-sm text-slate-600">{assignment.bookedSeats || 1} seat{assignment.bookedSeats === 1 ? '' : 's'} · {amount(assignment.grossFare)}</p></div><button className="rounded-lg bg-indigo-700 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60" disabled={isSubmitting} onClick={advanceRide} type="button">{isSubmitting ? 'Updating…' : action[1]}</button></div>{error && <p className="mt-3 text-sm text-rose-700" role="alert">{error}</p>}</div>;
+}
+
 export function PendingProposalCard({ proposal }) {
   if (!proposal) return null;
   return <article className="rounded-lg border border-amber-200 bg-amber-50 p-4"><h3 className="font-semibold text-amber-950">Ride offer pending</h3><p className="mt-2 text-sm text-amber-900">Waiting for the rider to confirm your offer. The ride will appear here as an active assignment after confirmation.</p><p className="mt-2 text-sm text-slate-700"><span className="font-medium">Pickup:</span> {locationLabel(proposal.pickup)}</p><p className="mt-1 text-sm text-slate-700"><span className="font-medium">Destination:</span> {locationLabel(proposal.dropoff)}</p></article>;
@@ -280,6 +308,7 @@ export default function DriverDashboardPage() {
         <section className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold">Active assignment</h2><p className="mt-1 text-sm text-slate-600">Only your current Ride or Courier delivery is shown here.</p></div></div>
           <ActiveAssignmentCard assignment={dashboard.activeAssignment} />
+          <ActiveRideControls assignment={dashboard.activeAssignment} onUpdated={loadDashboard} />
           <PendingProposalCard proposal={dashboard.pendingProposal} />
           {dashboard.assignmentConflict && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">This driver has conflicting active assignments. Complete or resolve one before accepting another request.</p>}
           {dashboard.activeAssignment?.serviceType === 'RIDE' && <>

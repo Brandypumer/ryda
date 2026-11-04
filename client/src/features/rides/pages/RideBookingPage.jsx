@@ -14,10 +14,11 @@ const OFF_PLATFORM_PAYMENT_WARNING =
 const initialLocation = { address: '', latitude: '', longitude: '' };
 const statusCopy = {
   REQUESTED: 'Looking for a driver',
-  ACCEPTED: 'Driver accepted your ride',
+  ACCEPTED: 'Driver confirmed',
   DRIVER_ARRIVING: 'Driver is on the way',
-  DRIVER_ARRIVED: 'Driver has arrived',
-  IN_PROGRESS: 'Ride in progress'
+  DRIVER_ARRIVED: 'Your driver has arrived',
+  IN_PROGRESS: 'Ride in progress',
+  COMPLETED: 'Ride completed'
 };
 
 function hasValidCoordinates(location) {
@@ -68,7 +69,14 @@ function RideHub() {
   }, [isAuthenticated, isRestoring, loadRides, user?.role]);
 
   const activeRide = useMemo(() => rides.find((ride) => ACTIVE_RIDE_STATUSES.has(ride.status)) || null, [rides]);
-  useRideStatusUpdates({ ride: activeRide, token, onUpdate: setRides, onProposal: loadRides });
+  const handleRideUpdate = useCallback((updater) => {
+    setRides((current) => {
+      const next = updater(current);
+      if (next.some((item, index) => String(item._id) === String(current[index]?._id) && item.status === 'COMPLETED' && current[index]?.status !== 'COMPLETED')) setSuccess('Ride completed. You can book another ride.');
+      return next;
+    });
+  }, []);
+  useRideStatusUpdates({ ride: activeRide, token, onUpdate: handleRideUpdate, onProposal: loadRides });
 
   if (isRestoring) return <RidePageMessage message="Checking your saved session…" />;
   if (!isAuthenticated) return <Navigate replace to="/login" />;

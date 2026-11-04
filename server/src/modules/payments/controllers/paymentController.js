@@ -4,6 +4,7 @@ import Payment from '../models/Payment.js';
 import { initializePaystackTransaction, verifyPaystackTransaction } from '../services/paystackService.js';
 import { getOwnedService, getPaymentAmounts, ngnToKobo, reconcilePaidPayment, settlePayment } from '../services/paymentService.js';
 import User from '../../identity/models/User.js';
+import { getClientOrigin } from '../../../shared/config/clientOrigin.js';
 
 function normalizeServiceType(value) {
   return typeof value === 'string' ? value.trim().toUpperCase() : value;
@@ -20,6 +21,7 @@ export async function initializePayment(request, response, next) {
     }
 
     const { service } = await getOwnedService({ serviceType, serviceId, userId: request.user.id });
+    const callbackUrl = `${getClientOrigin()}/rides`;
     const paidPayment = await Payment.findOne({ serviceType, serviceId: service._id, userId: request.user.id, status: 'PAID' }).sort({ paidAt: -1, createdAt: -1 });
     if (paidPayment) {
       const result = await reconcilePaidPayment(paidPayment);
@@ -38,7 +40,8 @@ export async function initializePayment(request, response, next) {
         email,
         amountKobo: ngnToKobo(amounts.grossAmount),
         reference: retryReference,
-        metadata: { serviceType, serviceId: String(service._id), userId: String(request.user.id) }
+        metadata: { serviceType, serviceId: String(service._id), userId: String(request.user.id) },
+        callbackUrl
       });
       existing.reference = retryPaystack.reference || retryReference;
       existing.authorizationUrl = retryPaystack.authorization_url || '';
@@ -51,7 +54,8 @@ export async function initializePayment(request, response, next) {
       email,
       amountKobo: ngnToKobo(amounts.grossAmount),
       reference,
-      metadata: { serviceType, serviceId: String(service._id), userId: String(request.user.id) }
+      metadata: { serviceType, serviceId: String(service._id), userId: String(request.user.id) },
+      callbackUrl
     });
 
     const payment = await Payment.create({

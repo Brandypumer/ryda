@@ -3,6 +3,7 @@ import AppError from '../../../shared/utils/AppError.js';
 import Payment from '../models/Payment.js';
 import { initializePaystackTransaction, verifyPaystackTransaction } from '../services/paystackService.js';
 import { getOwnedService, getPaymentAmounts, settlePayment } from '../services/paymentService.js';
+import User from '../../identity/models/User.js';
 
 function normalizeServiceType(value) {
   return typeof value === 'string' ? value.trim().toUpperCase() : value;
@@ -12,8 +13,11 @@ export async function initializePayment(request, response, next) {
   try {
     const serviceType = normalizeServiceType(request.body.serviceType);
     const { serviceId } = request.body;
-    const email = request.body.email || request.user.email;
-    if (!email || typeof email !== 'string') throw new AppError('A valid payment email is required.', 400);
+    const user = await User.findById(request.user.id).select('email');
+    const email = user?.email;
+    if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      throw new AppError('Your account must have a valid email before starting payment.', 400);
+    }
 
     const { service } = await getOwnedService({ serviceType, serviceId, userId: request.user.id });
     if (service.paymentStatus === 'PAID') throw new AppError('This service has already been paid.', 409);

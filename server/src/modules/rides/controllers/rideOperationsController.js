@@ -18,12 +18,15 @@ export async function acceptRide(request, response, next) {
       throw new AppError('Ride not found.', 404);
     }
 
-    const requestedRide = await Ride.findOne({ _id: id, status: 'REQUESTED', driverId: null }).select('paymentStatus proposedDriverId');
+    const requestedRide = await Ride.findOne({ _id: id, status: 'REQUESTED', driverId: null }).select('paymentStatus proposedDriverId requestExpiresAt');
     if (!requestedRide) {
       throw new AppError('This ride is no longer available to accept.', 409);
     }
     if (requestedRide.paymentStatus !== 'PAID') {
       throw new AppError('Ride payment has not been completed.', 409);
+    }
+    if (!requestedRide.requestExpiresAt || requestedRide.requestExpiresAt <= new Date()) {
+      throw new AppError('This ride request has expired.', 409);
     }
 
     await assertDriverEligible(request.user.id);

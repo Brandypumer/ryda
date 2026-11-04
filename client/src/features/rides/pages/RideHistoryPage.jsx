@@ -89,7 +89,7 @@ export default function RideHistoryPage() {
               type="button"
             >
               <span className="block font-semibold text-slate-900">{ride.pickup?.address} → {ride.destination?.address}</span>
-              <span className="mt-1 block text-sm text-slate-600">{ride.status} · ₦{ride.grossFare}</span>
+              <span className="mt-1 block text-sm text-slate-600">{ride.status === 'REQUESTED' && ride.requestExpiresAt && new Date(ride.requestExpiresAt) <= new Date() ? 'Search expired' : ride.status} · ₦{ride.grossFare}</span>
             </button>
           ))}
         </div>

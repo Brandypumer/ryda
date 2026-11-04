@@ -90,6 +90,10 @@ const rideSchema = new mongoose.Schema(
       enum: SERVICE_STATUSES.PAYMENT,
       default: 'PENDING'
     },
+    requestExpiresAt: {
+      type: Date,
+      default: null
+    },
     acceptedAt: Date,
     paymentDeadlineAt: Date,
     startedAt: Date,

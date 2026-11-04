@@ -76,7 +76,7 @@ function RideHub() {
   if (isLoading) return <RidePageMessage message="Loading your ride hub…" busy />;
 
   if (activeRide) {
-    return <section className="mx-auto max-w-6xl space-y-5 py-2 sm:py-6"><RideHubHeader />{loadError && <RetryNotice message={loadError} onRetry={loadRides} />}{success && <Notice tone="success">{success}</Notice>}<ActiveRidePanel ride={activeRide} accessToken={token} onPaymentStatusChange={(paymentStatus) => setRides((current) => current.map((item) => String(item._id) === String(activeRide._id) ? { ...item, paymentStatus } : item))} onCancelled={(cancelledRide) => { setRides((current) => current.map((item) => String(item._id) === String(cancelledRide._id) ? cancelledRide : item)); setSuccess('Ride cancelled.'); }} onRideUpdated={(updatedRide) => setRides((current) => current.map((item) => String(item._id) === String(updatedRide._id) ? updatedRide : item))} /></section>;
+    return <section className="mx-auto max-w-6xl space-y-5 py-2 sm:py-6"><RideHubHeader />{loadError && <RetryNotice message={loadError} onRetry={loadRides} />}{success && <Notice tone="success">{success}</Notice>}<ActiveRidePanel ride={activeRide} accessToken={token} onPaymentStatusChange={async (paymentStatus) => { setRides((current) => current.map((item) => String(item._id) === String(activeRide._id) ? { ...item, paymentStatus } : item)); await loadRides(); }} onCancelled={(cancelledRide) => { setRides((current) => current.map((item) => String(item._id) === String(cancelledRide._id) ? cancelledRide : item)); setSuccess('Ride cancelled.'); }} onRideUpdated={(updatedRide) => setRides((current) => current.map((item) => String(item._id) === String(updatedRide._id) ? updatedRide : item))} /></section>;
   }
 
   const capacity = RYDA_CONFIG.KEKE_SEAT_CAPACITY;
@@ -129,7 +129,21 @@ function useRideStatusUpdates({ ride, token, onUpdate, onProposal }) {
 function ActiveRidePanel({ ride, accessToken, onPaymentStatusChange, onCancelled, onRideUpdated }) {
   const privateRide = ride.isPrivateRide || ride.bookedSeats === RYDA_CONFIG.KEKE_SEAT_CAPACITY;
   const canCancel = ['REQUESTED', 'ACCEPTED', 'DRIVER_ARRIVING', 'DRIVER_ARRIVED'].includes(ride.status);
-  async function respondToDriver(action) { const { data } = await api.post(`/rides/${ride._id}/${action}`); onRideUpdated(data.ride); }
+  const [remainingMs, setRemainingMs] = useState(() => Math.max(0, new Date(ride.requestExpiresAt || 0).getTime() - Date.now()));
+  const [actionError, setActionError] = useState('');
+  useEffect(() => {
+    if (ride.status !== 'REQUESTED' || ride.paymentStatus !== 'PAID' || ride.proposedDriverId) return undefined;
+    const update = () => setRemainingMs(Math.max(0, new Date(ride.requestExpiresAt || 0).getTime() - Date.now()));
+    update();
+    const timer = window.setInterval(update, 1000);
+    return () => window.clearInterval(timer);
+  }, [ride.paymentStatus, ride.proposedDriverId, ride.requestExpiresAt, ride.status]);
+  const searchExpired = ride.status === 'REQUESTED' && ride.paymentStatus === 'PAID' && !ride.proposedDriverId && (!ride.requestExpiresAt || remainingMs <= 0);
+  async function respondToDriver(action) {
+    setActionError('');
+    try { const { data } = await api.post(`/rides/${ride._id}/${action}`); onRideUpdated(data.ride); }
+    catch (error) { setActionError(error.response?.data?.message || 'Unable to update this ride. Please refresh and try again.'); }
+  }
   return <article className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200"><div className="border-b border-slate-100 p-5 sm:p-7"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm font-semibold uppercase tracking-wide text-emerald-700">Active ride</p><h1 className="mt-1 text-2xl font-bold text-slate-950">{statusCopy[ride.status] || 'Ride update'}</h1></div><StatusBadge status={ride.status} /></div><dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4"><Detail label="Pickup" value={ride.pickup?.address || 'Pickup details unavailable'} /><Detail label="Destination" value={ride.destination?.address || 'Destination details unavailable'} /><Detail label="Seats" value={`${ride.bookedSeats || 1} ${ride.bookedSeats === 1 ? 'seat' : 'seats'}${privateRide ? ' · Private Keke' : ''}`} /><Detail label="Fare" value={formatNaira(ride.grossFare)} />{ride.paymentStatus && <Detail label="Payment" value={ride.paymentStatus} />}</dl></div><div className="space-y-4 p-5 sm:p-7">{ride.paymentStatus !== 'PAID' && <RidePaymentPanel ride={ride} onPaymentStatusChange={onPaymentStatusChange} />}{ride.proposedDriverId && ride.status === 'REQUESTED' && <section className="rounded-xl border border-sky-200 bg-sky-50 p-4"><h2 className="font-semibold text-sky-950">Driver found</h2><p className="mt-1 text-sm text-sky-900">{ride.proposedDriver?.fullName || 'A verified driver'} wants to take your ride.</p><div className="mt-3 flex flex-wrap gap-2"><button className="rounded-lg bg-sky-700 px-3 py-2 text-sm font-semibold text-white" onClick={() => respondToDriver('confirm-driver')} type="button">Accept Driver</button><button className="rounded-lg border border-sky-300 bg-white px-3 py-2 text-sm font-semibold text-sky-800" onClick={() => respondToDriver('decline-driver')} type="button">Decline</button></div></section>}{ride.paymentStatus === 'PAID' && ride.status === 'REQUESTED' && !ride.proposedDriverId && <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">Payment paid. Looking for a driver...</p>}{canCancel && <RideCancellationPanel ride={ride} onCancelled={onCancelled} />}{ride.status === 'REQUESTED' && ride.paymentStatus !== 'PAID' && <p className="text-sm text-slate-600">Complete payment before a driver can accept this ride.</p>}{ride.status === 'REQUESTED' && <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">Your pickup and destination are shown below while the request is open.</p>}<RideTrackingMap key={ride._id} ride={ride} accessToken={accessToken} shareRiderLocation={TRACKING_STATUSES.has(ride.status)} /></div></article>;
 }
 
@@ -160,7 +174,7 @@ function RidePaymentPanel({ ride, onPaymentStatusChange }) {
     setMessage('');
     try {
       await api.get(`/payments/verify/${encodeURIComponent(payment.reference)}`);
-      onPaymentStatusChange('PAID');
+      await onPaymentStatusChange('PAID');
       setMessage('Ride payment verified.');
     } catch (error) {
       setMessage(error.response?.data?.message || 'Payment is not verified yet. You can retry after completing checkout.');

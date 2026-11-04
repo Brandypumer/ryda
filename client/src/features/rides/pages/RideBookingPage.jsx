@@ -94,9 +94,9 @@ function RideHub() {
     event.preventDefault();
     setBookingError('');
     setSuccess('');
-    if (!pickup.address.trim() || !destination.address.trim()) return setBookingError('Enter both your pickup point and destination.');
+    if (!pickup.address.trim() || !destination.address.trim()) return setBookingError('Select both a pickup location and destination.');
     if (!Number.isInteger(bookedSeats) || bookedSeats < 1 || bookedSeats > capacity) return setBookingError(`Choose between 1 and ${capacity} seats.`);
-    if (!hasValidCoordinates(pickup) || !hasValidCoordinates(destination)) return setBookingError('Add valid map coordinates for both locations before requesting your ride.');
+    if (!hasValidCoordinates(pickup) || !hasValidCoordinates(destination)) return setBookingError('Select a suggested pickup and destination so we can locate your ride.');
     setIsSubmitting(true);
     try {
       const response = await api.post('/rides', {
@@ -224,7 +224,52 @@ function Detail({ label, value }) { return <div><dt className="font-medium text-
 function StatusBadge({ status }) { return <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800">{status}</span>; }
 function SeatSelector({ capacity, bookedSeats, onChange }) { return <fieldset><legend className="text-sm font-semibold text-slate-900">How many seats do you need?</legend><p className="mt-1 text-sm text-slate-600">Choose all {capacity} seats to book a private Keke.</p><div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">{Array.from({ length: capacity }, (_, index) => index + 1).map((count) => <button key={count} aria-pressed={bookedSeats === count} className={`rounded-xl border px-3 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 ${bookedSeats === count ? 'border-emerald-600 bg-emerald-50 text-emerald-900 ring-1 ring-emerald-600' : 'border-slate-200 text-slate-700 hover:border-emerald-400 hover:bg-emerald-50/50'}`} onClick={() => onChange(count)} type="button"><span className="block font-semibold">{count} {count === 1 ? 'seat' : 'seats'}</span><span className="mt-1 block text-sm">{formatNaira(count * RYDA_CONFIG.RIDE_FARE_PER_SEAT_NGN)}</span>{count === capacity && <span className="mt-1 block text-xs font-medium">Private Keke</span>}</button>)}</div></fieldset>; }
 function FarePreview({ bookedSeats, capacity, fare }) { return <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4"><div className="flex items-start justify-between gap-4"><div><p className="text-sm font-semibold text-emerald-950">Fare preview</p><p className="mt-1 text-sm text-emerald-900">{bookedSeats} {bookedSeats === 1 ? 'seat' : 'seats'} at {formatNaira(RYDA_CONFIG.RIDE_FARE_PER_SEAT_NGN)} each</p></div><p className="text-2xl font-bold text-emerald-950">{formatNaira(fare)}</p></div>{bookedSeats === capacity && <p className="mt-3 rounded-lg bg-white/70 px-3 py-2 text-sm font-medium text-emerald-900">Private Keke selected: all {capacity} seats are reserved for your trip.</p>}</div>; }
-function LocationFields({ label, placeholder, location, onChange }) { return <fieldset className="space-y-3"><legend className="text-sm font-semibold text-slate-900">{label}</legend><label className="block text-sm font-medium text-slate-700">Address<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100" onChange={(event) => onChange('address', event.target.value)} placeholder={placeholder} required value={location.address} /></label><details className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"><summary className="cursor-pointer text-sm font-medium text-slate-700">Add map coordinates required by the current ride service</summary><p className="mt-2 text-xs leading-5 text-slate-600">These help drivers locate your pickup and destination. They are required by the existing ride API.</p><div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2"><label className="text-sm text-slate-700">Latitude<input className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100" inputMode="decimal" onChange={(event) => onChange('latitude', event.target.value)} step="any" type="number" value={location.latitude} /></label><label className="text-sm text-slate-700">Longitude<input className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100" inputMode="decimal" onChange={(event) => onChange('longitude', event.target.value)} step="any" type="number" value={location.longitude} /></label></div></details></fieldset>; }
+function LocationFields({ label, placeholder, location, onChange }) {
+  const [query, setQuery] = useState(location.address || '');
+  const [suggestions, setSuggestions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const apiKey = import.meta.env.VITE_OPENROUTESERVICE_API_KEY;
+
+  useEffect(() => { setQuery(location.address || ''); }, [location.address]);
+  useEffect(() => {
+    if (query.trim().length < 3 || !apiKey) { setSuggestions([]); return undefined; }
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setLoading(true); setError('');
+      try {
+        const response = await fetch(`https://api.heigit.org/pelias/v1/autocomplete?api_key=${encodeURIComponent(apiKey)}&text=${encodeURIComponent(query.trim())}&size=5`, { signal: controller.signal });
+        if (!response.ok) throw new Error('Location search unavailable.');
+        const data = await response.json();
+        setSuggestions(Array.isArray(data.features) ? data.features : []);
+      } catch (requestError) { if (requestError.name !== 'AbortError') setError('Location search unavailable.'); }
+      finally { setLoading(false); }
+    }, 350);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [apiKey, query]);
+
+  function selectFeature(feature) {
+    const [longitude, latitude] = feature.geometry?.coordinates || [];
+    if (!Number.isFinite(Number(latitude)) || !Number.isFinite(Number(longitude))) return;
+    const address = feature.properties?.label || feature.properties?.name || query.trim();
+    setQuery(address); setSuggestions([]); onChange('address', address); onChange('latitude', Number(latitude)); onChange('longitude', Number(longitude));
+  }
+
+  function editAddress(event) { setQuery(event.target.value); onChange('address', event.target.value); onChange('latitude', ''); onChange('longitude', ''); }
+  function useCurrentLocation() {
+    if (!navigator.geolocation) { setError('Location permission is off. Search for your pickup location instead.'); return; }
+    navigator.geolocation.getCurrentPosition(async ({ coords }) => {
+      onChange('latitude', coords.latitude); onChange('longitude', coords.longitude); setError('');
+      try {
+        const response = await fetch(`https://api.heigit.org/pelias/v1/reverse?api_key=${encodeURIComponent(apiKey)}&point.lat=${coords.latitude}&point.lon=${coords.longitude}`);
+        const data = await response.json(); const address = data.features?.[0]?.properties?.label || 'Current location';
+        setQuery(address); onChange('address', address);
+      } catch (_error) { setQuery('Current location'); onChange('address', 'Current location'); }
+    }, () => setError('Location permission is off. Search for your pickup location instead.'));
+  }
+
+  return <fieldset className="space-y-3"><legend className="text-sm font-semibold text-slate-900">{label}</legend><label className="relative block text-sm font-medium text-slate-700">{label === 'Pickup point' ? 'Where should your driver meet you?' : 'Where are you going?'}<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100" onChange={editAddress} placeholder={placeholder} required value={query} />{suggestions.length > 0 && <div className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">{suggestions.map((feature) => <button className="block w-full px-3 py-2 text-left text-sm hover:bg-emerald-50" key={feature.properties?.id || feature.properties?.label} onClick={() => selectFeature(feature)} type="button">{feature.properties?.label || feature.properties?.name}</button>)}</div>}</label>{label === 'Pickup point' && <button className="text-sm font-semibold text-emerald-700" onClick={useCurrentLocation} type="button">Use my current location</button>}{loading && <p className="text-xs text-slate-500">Searching locations…</p>}{error && <p className="text-sm text-amber-800" role="status">{error}</p>}</fieldset>;
+}
 
 class RideHubErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { failed: false }; }

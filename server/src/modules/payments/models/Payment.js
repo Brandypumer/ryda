@@ -15,6 +15,7 @@ const paymentSchema = new Schema(
     driverNet: { type: Number, required: true, min: 0 },
     status: { type: String, enum: SERVICE_STATUSES.PAYMENT, default: 'PENDING', index: true },
     provider: { type: String, required: true, trim: true },
+    authorizationUrl: { type: String, default: '' },
     paidAt: { type: Date },
     walletCreditedAt: { type: Date }
   },

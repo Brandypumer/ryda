@@ -9,10 +9,11 @@ import courierRouter from './modules/courier/courier.router.js';
 import driverOpsRouter from './modules/driverOps/driverOps.router.js';
 import rideOperationsRouter from './modules/rides/routes/rideOperationsRoutes.js';
 import rideRequestRouter from './modules/rides/routes/rideRequestRoutes.js';
+import { getClientOrigin } from './shared/config/clientOrigin.js';
 
 const app = express();
 
-app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }));
+app.use(cors({ origin: getClientOrigin() }));
 app.use(express.json());
 
 app.get('/api/health', (_request, response) => {

@@ -115,7 +115,10 @@ function RideDetails({ ride, accessToken }) {
       const { data } = await api.post('/payments/initialize', { serviceType: 'RIDE', serviceId: ride._id });
       setPayment(data.payment);
       setAuthorizationUrl(data.authorizationUrl || '');
-      if (!data.authorizationUrl) setMessage('A pending payment already exists. Finish checkout and verify it here.');
+      if (data.payment?.status === 'PAID' || data.alreadyVerified) {
+        setPaymentStatus('PAID');
+        setMessage('Ride payment is already confirmed.');
+      } else if (!data.authorizationUrl) setMessage('A pending payment already exists. Finish checkout and verify it here.');
     } catch (requestError) {
       setMessage(requestError.response?.data?.message || 'Unable to start payment.');
     }

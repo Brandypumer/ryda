@@ -31,6 +31,14 @@ function toObjectId(value, fieldName) {
   return new mongoose.Types.ObjectId(value);
 }
 
+export function ngnToKobo(amountNgn) {
+  const amount = Number(amountNgn);
+  if (!Number.isFinite(amount) || amount < 0) {
+    throw new AppError('Payment amount must be a valid NGN value.', 409);
+  }
+  return Math.round(amount * 100);
+}
+
 export async function getOwnedService({ serviceType, serviceId, userId }) {
   const config = getServiceConfig(serviceType);
   const model = getServiceModel(serviceType);
@@ -63,16 +71,50 @@ export function getPaymentAmounts(service) {
   return amounts;
 }
 
+export async function reconcilePaidPayment(payment) {
+  const config = getServiceConfig(payment.serviceType);
+  const model = getServiceModel(payment.serviceType);
+  const serviceUpdate = { $set: { paymentStatus: 'PAID' } };
+
+  if (payment.serviceType === 'RIDE') {
+    const currentService = await model.findById(payment.serviceId).select('requestExpiresAt');
+    if (!currentService?.requestExpiresAt) {
+      serviceUpdate.$set.requestExpiresAt = new Date(Date.now() + RYDA_CONFIG.RIDE_REQUEST_EXPIRY_MINUTES * 60 * 1000);
+    }
+  }
+
+  await model.updateOne({ _id: payment.serviceId }, serviceUpdate);
+  await PlatformFeeLiability.findOneAndUpdate(
+    { serviceType: payment.serviceType, serviceId: payment.serviceId, status: { $in: ['PENDING', 'OVERDUE'] } },
+    { $set: { status: 'SETTLED', settledAt: new Date() } },
+    { new: true }
+  );
+
+  const service = await model.findById(payment.serviceId).select('status');
+  const earning = service && config.completedStatuses.includes(service.status)
+    ? await creditDriverEarningOnce(payment._id)
+    : { credited: false };
+
+  return { payment: await Payment.findById(payment._id), earning };
+}
+
 export async function settlePayment(payment, paystackData) {
-  const amountKobo = Math.round(payment.grossAmount * 100);
+  const model = getServiceModel(payment.serviceType);
+  const service = await model.findById(payment.serviceId).select('grossFare platformFee driverNet');
+  if (!service) throw new AppError('The paid service could not be found.', 404);
+  const authoritativeAmounts = getPaymentAmounts(service);
+  const amountKobo = ngnToKobo(authoritativeAmounts.grossAmount);
   const verifiedAmountKobo = Number(paystackData?.amount);
   if (
     !paystackData ||
-    paystackData.reference && paystackData.reference !== payment.reference ||
+    paystackData.reference !== payment.reference ||
     !Number.isInteger(verifiedAmountKobo) || verifiedAmountKobo !== amountKobo ||
-    paystackData.currency && paystackData.currency !== 'NGN'
+    String(paystackData.currency || '').trim().toUpperCase() !== 'NGN'
   ) {
     throw new AppError('The verified Paystack amount does not match this service.', 400);
+  }
+  if (payment.grossAmount !== authoritativeAmounts.grossAmount) {
+    throw new AppError('The payment record does not match the service fare.', 409);
   }
 
   const paidPayment = await Payment.findOneAndUpdate(
@@ -81,31 +123,7 @@ export async function settlePayment(payment, paystackData) {
     { new: true }
   ) || await Payment.findById(payment._id);
 
-  const config = getServiceConfig(paidPayment.serviceType);
-  const model = getServiceModel(paidPayment.serviceType);
-
-  const serviceUpdate = { $set: { paymentStatus: 'PAID' } };
-  if (paidPayment.serviceType === 'RIDE') {
-    const currentService = await model.findById(paidPayment.serviceId).select('requestExpiresAt');
-    if (!currentService?.requestExpiresAt) {
-      serviceUpdate.$set.requestExpiresAt = new Date(Date.now() + RYDA_CONFIG.RIDE_REQUEST_EXPIRY_MINUTES * 60 * 1000);
-    }
-  }
-  await model.updateOne({ _id: paidPayment.serviceId }, serviceUpdate);
-
-  await PlatformFeeLiability.findOneAndUpdate(
-    { serviceType: paidPayment.serviceType, serviceId: paidPayment.serviceId, status: { $in: ['PENDING', 'OVERDUE'] } },
-    { $set: { status: 'SETTLED', settledAt: new Date() } },
-    { new: true }
-  );
-
-  const service = await model.findById(paidPayment.serviceId).select('status');
-  let earning = { credited: false };
-  if (service && config.completedStatuses.includes(service.status)) {
-    earning = await creditDriverEarningOnce(paidPayment._id);
-  }
-
-  return { payment: paidPayment, earning };
+  return reconcilePaidPayment(paidPayment);
 }
 
 export async function creditCompletedPayment(paymentId) {

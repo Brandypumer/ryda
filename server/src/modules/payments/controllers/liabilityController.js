@@ -4,6 +4,7 @@ import Payment from '../models/Payment.js';
 import { initializePaystackTransaction, verifyPaystackTransaction } from '../services/paystackService.js';
 import { getDriverFinancialEligibility } from '../services/liabilityService.js';
 import PlatformFeeLiability from '../models/PlatformFeeLiability.js';
+import { ngnToKobo } from '../services/paymentService.js';
 
 export async function listDriverLiabilities(request, response, next) {
   try {
@@ -60,7 +61,7 @@ export async function settleDriverLiability(request, response, next) {
       const paymentReference = `RYDA-FEE-${crypto.randomUUID()}`;
       const paystack = await initializePaystackTransaction({
         email: payerEmail,
-        amountKobo: Math.round(liability.amount * 100),
+        amountKobo: ngnToKobo(liability.amount),
         reference: paymentReference,
         metadata: {
           serviceType: 'FEE_SETTLEMENT',
@@ -102,10 +103,10 @@ export async function settleDriverLiability(request, response, next) {
 
     if (payment.status !== 'PAID') {
       const paystack = await verifyPaystackTransaction(reference);
-      if (paystack.status !== 'success' || paystack.reference && paystack.reference !== payment.reference) {
+      if (paystack.status !== 'success' || paystack.reference !== payment.reference) {
         throw new AppError('Paystack has not verified this fee settlement.', 409);
       }
-      if (paystack.amount !== Math.round(liability.amount * 100) || paystack.currency && paystack.currency !== 'NGN') {
+      if (Number(paystack.amount) !== ngnToKobo(liability.amount) || String(paystack.currency || '').trim().toUpperCase() !== 'NGN') {
         throw new AppError('The verified fee settlement amount does not match the liability.', 400);
       }
 

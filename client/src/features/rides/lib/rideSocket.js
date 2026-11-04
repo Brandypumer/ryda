@@ -8,7 +8,9 @@ export function friendlyRideSocketError() {
 
 export function getRideSocket(accessToken) {
   if (!rideSocket) {
-    const configuredUrl = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+    const configuredUrl = import.meta.env.VITE_SOCKET_URL
+      || import.meta.env.VITE_API_URL
+      || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5000');
     const socketUrl = configuredUrl.replace(/\/api\/?$/, '').replace(/\/$/, '');
     rideSocket = io(socketUrl, {
       autoConnect: false,

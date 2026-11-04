@@ -1,11 +1,12 @@
 import { Server } from 'socket.io';
+import { getClientOrigin } from '../config/clientOrigin.js';
 
 let io;
 
 export function initializeSocket(httpServer) {
   io = new Server(httpServer, {
     cors: {
-      origin: process.env.CLIENT_URL || 'http://localhost:5173',
+      origin: getClientOrigin(),
       methods: ['GET', 'POST']
     }
   });

@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import AppError from '../../../shared/utils/AppError.js';
 import Payment from '../models/Payment.js';
 import { initializePaystackTransaction, verifyPaystackTransaction } from '../services/paystackService.js';
-import { getOwnedService, getPaymentAmounts, settlePayment } from '../services/paymentService.js';
+import { getOwnedService, getPaymentAmounts, ngnToKobo, reconcilePaidPayment, settlePayment } from '../services/paymentService.js';
 import User from '../../identity/models/User.js';
 
 function normalizeServiceType(value) {
@@ -20,6 +20,11 @@ export async function initializePayment(request, response, next) {
     }
 
     const { service } = await getOwnedService({ serviceType, serviceId, userId: request.user.id });
+    const paidPayment = await Payment.findOne({ serviceType, serviceId: service._id, userId: request.user.id, status: 'PAID' }).sort({ paidAt: -1, createdAt: -1 });
+    if (paidPayment) {
+      const result = await reconcilePaidPayment(paidPayment);
+      return response.status(200).json({ payment: result.payment, authorizationUrl: null, accessCode: null, alreadyVerified: true });
+    }
     if (service.paymentStatus === 'PAID') throw new AppError('This service has already been paid.', 409);
     const amounts = getPaymentAmounts(service);
     const existing = await Payment.findOne({ serviceType, serviceId: service._id, status: 'PENDING' }).sort({ createdAt: -1 });
@@ -31,7 +36,7 @@ export async function initializePayment(request, response, next) {
       const retryReference = `RYDA-${serviceType}-${crypto.randomUUID()}`;
       const retryPaystack = await initializePaystackTransaction({
         email,
-        amountKobo: Math.round(amounts.grossAmount * 100),
+        amountKobo: ngnToKobo(amounts.grossAmount),
         reference: retryReference,
         metadata: { serviceType, serviceId: String(service._id), userId: String(request.user.id) }
       });
@@ -44,7 +49,7 @@ export async function initializePayment(request, response, next) {
     const reference = `RYDA-${serviceType}-${crypto.randomUUID()}`;
     const paystack = await initializePaystackTransaction({
       email,
-      amountKobo: Math.round(amounts.grossAmount * 100),
+      amountKobo: ngnToKobo(amounts.grossAmount),
       reference,
       metadata: { serviceType, serviceId: String(service._id), userId: String(request.user.id) }
     });
@@ -76,7 +81,10 @@ export async function verifyPayment(request, response, next) {
     const { reference } = request.params;
     const payment = await Payment.findOne({ reference, userId: request.user.id });
     if (!payment) throw new AppError('Payment reference was not found.', 404);
-    if (payment.status === 'PAID') return response.status(200).json({ payment, alreadyVerified: true });
+    if (payment.status === 'PAID') {
+      const result = await reconcilePaidPayment(payment);
+      return response.status(200).json({ payment: result.payment, earning: result.earning, alreadyVerified: true });
+    }
 
     const paystack = await verifyPaystackTransaction(reference);
     if (paystack.status !== 'success') throw new AppError('Paystack has not marked this transaction successful.', 409);

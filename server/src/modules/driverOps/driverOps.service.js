@@ -173,7 +173,7 @@ export async function getAvailableRequests(driverId) {
 
   const [Ride, CourierDelivery] = [getRideModel(), getCourierModel()];
   const [rides, courier] = await Promise.all([
-    Ride ? Ride.find({ status: 'REQUESTED', driverId: null }).sort({ createdAt: 1 }).lean() : [],
+    Ride ? Ride.find({ status: 'REQUESTED', paymentStatus: 'PAID', driverId: null }).sort({ createdAt: 1 }).lean() : [],
     CourierDelivery ? CourierDelivery.find({ status: 'REQUESTED', driverId: null }).sort({ createdAt: 1 }).lean() : []
   ]);
 

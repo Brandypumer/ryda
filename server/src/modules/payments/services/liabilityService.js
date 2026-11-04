@@ -37,6 +37,9 @@ export async function ensurePlatformFeeLiability({ driverId, serviceType, servic
   if (!Number.isFinite(amount) || amount <= 0) throw new AppError('Liability amount must be positive.', 400);
   if (!(dueAt instanceof Date) || Number.isNaN(dueAt.getTime())) throw new AppError('dueAt is invalid.', 400);
 
+  const paidPayment = await Payment.exists({ serviceType, serviceId: serviceObjectId, status: 'PAID' });
+  const settledAt = paidPayment ? new Date() : undefined;
+
   return PlatformFeeLiability.findOneAndUpdate(
     { serviceType, serviceId: serviceObjectId },
     {
@@ -45,8 +48,9 @@ export async function ensurePlatformFeeLiability({ driverId, serviceType, servic
         serviceType,
         serviceId: serviceObjectId,
         amount,
-        status: 'PENDING',
-        dueAt
+        status: paidPayment ? 'SETTLED' : 'PENDING',
+        dueAt,
+        ...(settledAt ? { settledAt } : {})
       }
     },
     { new: true, upsert: true, setDefaultsOnInsert: true }

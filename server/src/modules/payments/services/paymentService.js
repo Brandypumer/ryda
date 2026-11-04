@@ -38,7 +38,9 @@ export async function getOwnedService({ serviceType, serviceId, userId }) {
   const service = await model.findOne({ _id: id, [config.ownerField]: ownerId });
 
   if (!service) throw new AppError('Service was not found or does not belong to this account.', 404);
-  if (!service.driverId) throw new AppError('The service must have an assigned driver before payment.', 409);
+  if (serviceType === 'COURIER' && !service.driverId) {
+    throw new AppError('The service must have an assigned driver before payment.', 409);
+  }
   if (!Number.isFinite(service.grossFare) || service.grossFare <= 0) {
     throw new AppError('The service does not have a valid server-calculated fare.', 409);
   }

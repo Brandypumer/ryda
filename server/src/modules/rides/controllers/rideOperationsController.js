@@ -23,9 +23,21 @@ export async function acceptRide(request, response, next) {
 
     const alreadyAccepted = await Ride.findOne({ _id: id, driverId: request.user.id, status: 'ACCEPTED' });
     if (alreadyAccepted) {
+      await Payment.updateMany(
+        { serviceType: 'RIDE', serviceId: alreadyAccepted._id, driverId: null },
+        { $set: { driverId: alreadyAccepted.driverId } }
+      );
       await ensureServicePlatformFeeLiability({ serviceType: 'RIDE', service: alreadyAccepted });
       emitRideAccepted(alreadyAccepted);
       return response.status(200).json({ ride: alreadyAccepted });
+    }
+
+    const requestedRide = await Ride.findOne({ _id: id, status: 'REQUESTED', driverId: null }).select('paymentStatus');
+    if (!requestedRide) {
+      throw new AppError('This ride is no longer available to accept.', 409);
+    }
+    if (requestedRide.paymentStatus !== 'PAID') {
+      throw new AppError('Ride payment has not been completed.', 409);
     }
 
     await assertDriverEligible(request.user.id);
@@ -33,7 +45,7 @@ export async function acceptRide(request, response, next) {
 
     const acceptedAt = new Date();
     const ride = await Ride.findOneAndUpdate(
-      { _id: id, status: 'REQUESTED', driverId: null },
+      { _id: id, status: 'REQUESTED', paymentStatus: 'PAID', driverId: null },
       {
         $set: {
           driverId: request.user.id,
@@ -48,12 +60,21 @@ export async function acceptRide(request, response, next) {
     if (!ride) {
       const acceptedRide = await Ride.findOne({ _id: id, driverId: request.user.id, status: 'ACCEPTED' });
       if (acceptedRide) {
+        await Payment.updateMany(
+          { serviceType: 'RIDE', serviceId: acceptedRide._id, driverId: null },
+          { $set: { driverId: acceptedRide.driverId } }
+        );
         await ensureServicePlatformFeeLiability({ serviceType: 'RIDE', service: acceptedRide });
         emitRideAccepted(acceptedRide);
         return response.status(200).json({ ride: acceptedRide });
       }
       throw new AppError('This ride is no longer available to accept.', 409);
     }
+
+    await Payment.updateMany(
+      { serviceType: 'RIDE', serviceId: ride._id, driverId: null },
+      { $set: { driverId: ride.driverId } }
+    );
 
     try {
       await ensureServicePlatformFeeLiability({ serviceType: 'RIDE', service: ride });

@@ -76,7 +76,7 @@ function RideHub() {
   if (isLoading) return <RidePageMessage message="Loading your ride hub…" busy />;
 
   if (activeRide) {
-    return <section className="mx-auto max-w-6xl space-y-5 py-2 sm:py-6"><RideHubHeader />{loadError && <RetryNotice message={loadError} onRetry={loadRides} />}{success && <Notice tone="success">{success}</Notice>}<ActiveRidePanel ride={activeRide} accessToken={token} /></section>;
+    return <section className="mx-auto max-w-6xl space-y-5 py-2 sm:py-6"><RideHubHeader />{loadError && <RetryNotice message={loadError} onRetry={loadRides} />}{success && <Notice tone="success">{success}</Notice>}<ActiveRidePanel ride={activeRide} accessToken={token} onPaymentStatusChange={(paymentStatus) => setRides((current) => current.map((item) => String(item._id) === String(activeRide._id) ? { ...item, paymentStatus } : item))} onCancelled={(cancelledRide) => { setRides((current) => current.map((item) => String(item._id) === String(cancelledRide._id) ? cancelledRide : item)); setSuccess('Ride cancelled.'); }} /></section>;
   }
 
   const capacity = RYDA_CONFIG.KEKE_SEAT_CAPACITY;
@@ -125,9 +125,71 @@ function useRideStatusUpdates({ ride, token, onUpdate }) {
   }, [onUpdate, ride?._id, token]);
 }
 
-function ActiveRidePanel({ ride, accessToken }) {
+function ActiveRidePanel({ ride, accessToken, onPaymentStatusChange, onCancelled }) {
   const privateRide = ride.isPrivateRide || ride.bookedSeats === RYDA_CONFIG.KEKE_SEAT_CAPACITY;
-  return <article className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200"><div className="border-b border-slate-100 p-5 sm:p-7"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm font-semibold uppercase tracking-wide text-emerald-700">Active ride</p><h1 className="mt-1 text-2xl font-bold text-slate-950">{statusCopy[ride.status] || 'Ride update'}</h1></div><StatusBadge status={ride.status} /></div><dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4"><Detail label="Pickup" value={ride.pickup?.address || 'Pickup details unavailable'} /><Detail label="Destination" value={ride.destination?.address || 'Destination details unavailable'} /><Detail label="Seats" value={`${ride.bookedSeats || 1} ${ride.bookedSeats === 1 ? 'seat' : 'seats'}${privateRide ? ' · Private Keke' : ''}`} /><Detail label="Fare" value={formatNaira(ride.grossFare)} />{ride.paymentStatus && <Detail label="Payment" value={ride.paymentStatus} />}</dl></div><div className="p-5 sm:p-7">{ride.status === 'REQUESTED' && <p className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">Looking for a driver. Your pickup and destination are shown below while the request is open.</p>}<RideTrackingMap key={ride._id} ride={ride} accessToken={accessToken} shareRiderLocation={TRACKING_STATUSES.has(ride.status)} /></div></article>;
+  const canCancel = ['REQUESTED', 'ACCEPTED', 'DRIVER_ARRIVING', 'DRIVER_ARRIVED'].includes(ride.status);
+  return <article className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200"><div className="border-b border-slate-100 p-5 sm:p-7"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm font-semibold uppercase tracking-wide text-emerald-700">Active ride</p><h1 className="mt-1 text-2xl font-bold text-slate-950">{statusCopy[ride.status] || 'Ride update'}</h1></div><StatusBadge status={ride.status} /></div><dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4"><Detail label="Pickup" value={ride.pickup?.address || 'Pickup details unavailable'} /><Detail label="Destination" value={ride.destination?.address || 'Destination details unavailable'} /><Detail label="Seats" value={`${ride.bookedSeats || 1} ${ride.bookedSeats === 1 ? 'seat' : 'seats'}${privateRide ? ' · Private Keke' : ''}`} /><Detail label="Fare" value={formatNaira(ride.grossFare)} />{ride.paymentStatus && <Detail label="Payment" value={ride.paymentStatus} />}</dl></div><div className="space-y-4 p-5 sm:p-7">{ride.paymentStatus !== 'PAID' && <RidePaymentPanel ride={ride} onPaymentStatusChange={onPaymentStatusChange} />}{ride.paymentStatus === 'PAID' && ride.status === 'REQUESTED' && <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">Payment paid. Looking for a driver...</p>}{canCancel && <RideCancellationPanel ride={ride} onCancelled={onCancelled} />}{ride.status === 'REQUESTED' && ride.paymentStatus !== 'PAID' && <p className="text-sm text-slate-600">Complete payment before a driver can accept this ride.</p>}{ride.status === 'REQUESTED' && <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">Your pickup and destination are shown below while the request is open.</p>}<RideTrackingMap key={ride._id} ride={ride} accessToken={accessToken} shareRiderLocation={TRACKING_STATUSES.has(ride.status)} /></div></article>;
+}
+
+function RidePaymentPanel({ ride, onPaymentStatusChange }) {
+  const [payment, setPayment] = useState(null);
+  const [authorizationUrl, setAuthorizationUrl] = useState('');
+  const [message, setMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function initializePayment() {
+    setIsSubmitting(true);
+    setMessage('');
+    try {
+      const { data } = await api.post('/payments/initialize', { serviceType: 'RIDE', serviceId: ride._id });
+      setPayment(data.payment);
+      setAuthorizationUrl(data.authorizationUrl || '');
+      if (!data.authorizationUrl) setMessage('A pending payment already exists. Finish checkout and verify it here.');
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Unable to start payment. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function verifyPayment() {
+    if (!payment?.reference) return;
+    setIsSubmitting(true);
+    setMessage('');
+    try {
+      await api.get(`/payments/verify/${encodeURIComponent(payment.reference)}`);
+      onPaymentStatusChange('PAID');
+      setMessage('Ride payment verified.');
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Payment is not verified yet. You can retry after completing checkout.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-4" aria-label="Ride payment"><h2 className="font-semibold text-emerald-950">Pay for your ride</h2><p className="mt-1 text-sm text-emerald-900">Payment status: {ride.paymentStatus || 'PENDING'}</p><p className="mt-1 text-sm text-emerald-900">Complete payment before a driver can accept this ride.</p><p className="mt-2 text-sm leading-6 text-emerald-950">For your safety and transaction traceability, make payments only through RYDA. Payments made outside RYDA cannot be verified through our platform and are not covered by RYDA payment records or dispute support.</p>{message && <p className="mt-3 text-sm text-emerald-900" role="status">{message}</p>}{!payment ? <button className="mt-3 rounded-lg bg-emerald-700 px-4 py-2 font-semibold text-white disabled:bg-emerald-300" disabled={isSubmitting} onClick={initializePayment} type="button">{isSubmitting ? 'Starting payment...' : `Pay ${formatNaira(ride.grossFare)}`}</button> : <div className="mt-3 space-y-2"><p className="text-sm text-emerald-900">Reference: {payment.reference}</p>{authorizationUrl && <a className="block text-sm font-medium text-emerald-800 underline" href={authorizationUrl} rel="noreferrer" target="_blank">Open Paystack checkout</a>}<button className="rounded-lg bg-emerald-700 px-4 py-2 font-semibold text-white disabled:bg-emerald-300" disabled={isSubmitting} onClick={verifyPayment} type="button">{isSubmitting ? 'Checking payment...' : 'Verify payment / Retry'}</button><button className="rounded-lg border border-emerald-700 px-4 py-2 font-semibold text-emerald-800" disabled={isSubmitting} onClick={initializePayment} type="button">Retry payment</button></div>}</section>;
+}
+
+function RideCancellationPanel({ ride, onCancelled }) {
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  async function cancelRide() {
+    setIsSubmitting(true);
+    setError('');
+    try {
+      const { data } = await api.patch(`/rides/${ride._id}/cancel`);
+      onCancelled(data.ride);
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || 'Unable to cancel this ride. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+      setIsConfirming(false);
+    }
+  }
+
+  return <section className="space-y-2" aria-label="Ride cancellation">{error && <p className="text-sm text-rose-700" role="alert">{error}</p>}{!isConfirming ? <button className="rounded-lg border border-rose-300 px-4 py-2 font-semibold text-rose-700 hover:bg-rose-50" onClick={() => setIsConfirming(true)} type="button">Cancel Ride</button> : <div className="rounded-lg border border-rose-200 bg-rose-50 p-3"><p className="text-sm font-medium text-rose-900">Cancel this ride?</p><div className="mt-2 flex gap-2"><button className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold" disabled={isSubmitting} onClick={() => setIsConfirming(false)} type="button">Keep Ride</button><button className="rounded-lg bg-rose-600 px-3 py-2 text-sm font-semibold text-white disabled:bg-rose-300" disabled={isSubmitting} onClick={cancelRide} type="button">{isSubmitting ? 'Cancelling...' : 'Cancel Ride'}</button></div></div>}</section>;
 }
 
 function RideHubHeader() { return <header className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-sm font-semibold uppercase tracking-wide text-emerald-700">RYDA rides</p><h1 className="mt-1 text-2xl font-bold text-slate-950 sm:text-3xl">Your campus ride hub</h1></div><Link className="text-sm font-semibold text-emerald-700 underline decoration-emerald-300 underline-offset-4" to="/rides/history">Ride history</Link></header>; }

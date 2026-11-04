@@ -34,10 +34,16 @@ async function paystackRequest(path, options = {}) {
   return payload.data;
 }
 
-export function initializePaystackTransaction({ email, amountKobo, reference, metadata }) {
+export function initializePaystackTransaction({ email, amountKobo, reference, metadata, callbackUrl }) {
   return paystackRequest('/transaction/initialize', {
     method: 'POST',
-    body: JSON.stringify({ email, amount: amountKobo, reference, metadata })
+    body: JSON.stringify({
+      email,
+      amount: amountKobo,
+      reference,
+      metadata,
+      ...(callbackUrl ? { callback_url: callbackUrl } : {})
+    })
   });
 }
 

@@ -1,4 +1,4 @@
-import { Component, useCallback, useEffect, useMemo, useState } from 'react';
+import { Component, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 
 import { RYDA_CONFIG } from '../../../shared/constants/rydaConfig.js';
@@ -160,6 +160,38 @@ function RidePaymentPanel({ ride, onPaymentStatusChange }) {
   const [authorizationUrl, setAuthorizationUrl] = useState('');
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const callbackHandled = useRef(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const callbackReference = params.get('reference') || params.get('trxref');
+    if (!callbackReference || callbackHandled.current) return undefined;
+
+    callbackHandled.current = true;
+    let cancelled = false;
+    setIsSubmitting(true);
+    setMessage('Confirming your Paystack payment...');
+
+    async function verifyReturnedPayment() {
+      try {
+        const { data } = await api.get(`/payments/verify/${encodeURIComponent(callbackReference)}`);
+        if (cancelled) return;
+        await onPaymentStatusChange(data.payment?.status || 'PAID');
+        setMessage('Ride payment confirmed. Looking for a driver.');
+        const cleanUrl = new URL(window.location.href);
+        cleanUrl.searchParams.delete('reference');
+        cleanUrl.searchParams.delete('trxref');
+        window.history.replaceState({}, document.title, `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`);
+      } catch (error) {
+        if (!cancelled) setMessage(error.response?.data?.message || 'Payment is not verified yet. Use Verify payment / Retry.');
+      } finally {
+        if (!cancelled) setIsSubmitting(false);
+      }
+    }
+
+    verifyReturnedPayment();
+    return () => { cancelled = true; };
+  }, [onPaymentStatusChange]);
 
   async function initializePayment() {
     setIsSubmitting(true);

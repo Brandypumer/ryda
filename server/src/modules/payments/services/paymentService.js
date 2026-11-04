@@ -65,10 +65,11 @@ export function getPaymentAmounts(service) {
 
 export async function settlePayment(payment, paystackData) {
   const amountKobo = Math.round(payment.grossAmount * 100);
+  const verifiedAmountKobo = Number(paystackData?.amount);
   if (
     !paystackData ||
     paystackData.reference && paystackData.reference !== payment.reference ||
-    paystackData.amount !== amountKobo ||
+    !Number.isInteger(verifiedAmountKobo) || verifiedAmountKobo !== amountKobo ||
     paystackData.currency && paystackData.currency !== 'NGN'
   ) {
     throw new AppError('The verified Paystack amount does not match this service.', 400);
@@ -83,17 +84,14 @@ export async function settlePayment(payment, paystackData) {
   const config = getServiceConfig(paidPayment.serviceType);
   const model = getServiceModel(paidPayment.serviceType);
 
-  await model.updateOne(
-    { _id: paidPayment.serviceId },
-    {
-      $set: {
-        paymentStatus: 'PAID',
-        ...(paidPayment.serviceType === 'RIDE'
-          ? { requestExpiresAt: new Date(Date.now() + RYDA_CONFIG.RIDE_REQUEST_EXPIRY_MINUTES * 60 * 1000) }
-          : {})
-      }
+  const serviceUpdate = { $set: { paymentStatus: 'PAID' } };
+  if (paidPayment.serviceType === 'RIDE') {
+    const currentService = await model.findById(paidPayment.serviceId).select('requestExpiresAt');
+    if (!currentService?.requestExpiresAt) {
+      serviceUpdate.$set.requestExpiresAt = new Date(Date.now() + RYDA_CONFIG.RIDE_REQUEST_EXPIRY_MINUTES * 60 * 1000);
     }
-  );
+  }
+  await model.updateOne({ _id: paidPayment.serviceId }, serviceUpdate);
 
   await PlatformFeeLiability.findOneAndUpdate(
     { serviceType: paidPayment.serviceType, serviceId: paidPayment.serviceId, status: { $in: ['PENDING', 'OVERDUE'] } },

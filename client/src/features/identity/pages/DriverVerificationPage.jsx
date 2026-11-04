@@ -149,11 +149,45 @@ export default function DriverVerificationPage() {
     }
   }
 
+  function startResubmission() {
+    setValues({ vehicleNumber: profile.vehicleNumber || '' });
+    setVehicleImageFile(null);
+    setIdentityDocumentFile(null);
+    setError('');
+    setProfile(null);
+  }
+
+  if (profile?.verificationStatus === 'REJECTED') {
+    return (
+      <AuthLayout
+        title="Driver verification"
+        subtitle="Your verification was rejected. Update your details and documents, then submit them again for review."
+      >
+        <div className="space-y-4 text-sm text-slate-700">
+          <div>
+            <p className="font-medium text-slate-900">Verification status</p>
+            <span className={`mt-2 inline-flex rounded-full px-3 py-1 font-semibold ${STATUS_STYLES.REJECTED}`}>
+              Verification rejected
+            </span>
+          </div>
+          <p>Vehicle number: {profile.vehicleNumber}</p>
+          <button
+            className="w-full rounded-lg bg-teal-700 px-4 py-2.5 font-semibold text-white hover:bg-teal-800"
+            onClick={startResubmission}
+            type="button"
+          >
+            Resubmit verification
+          </button>
+        </div>
+      </AuthLayout>
+    );
+  }
+
   if (profile) {
     return (
       <AuthLayout
         title="Driver verification"
-        subtitle="Your verification has been submitted. You must wait for admin approval before going online."
+        subtitle={profile.verificationStatus === 'APPROVED' ? 'Your verification is approved.' : 'Your verification is under review. You must wait for admin approval before going online.'}
       >
         <div className="space-y-4 text-sm text-slate-700">
           <div>
@@ -163,9 +197,7 @@ export default function DriverVerificationPage() {
             </span>
           </div>
           <p>Vehicle number: {profile.vehicleNumber}</p>
-          <p className="rounded-lg bg-slate-50 p-3 text-slate-600">
-            Additional submissions are disabled while this verification record is under review.
-          </p>
+          {profile.verificationStatus === 'PENDING' && <p className="rounded-lg bg-slate-50 p-3 text-slate-600">Additional submissions are disabled while this verification record is under review.</p>}
         </div>
       </AuthLayout>
     );

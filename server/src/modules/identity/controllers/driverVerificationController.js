@@ -1,5 +1,5 @@
 import {
-  ensureDriverVerificationNotSubmitted,
+  ensureDriverVerificationCanBeSubmitted,
   getDriverVerification,
   submitDriverVerification
 } from '../services/driverVerificationService.js';
@@ -19,7 +19,7 @@ function getUploadedFile(files, fieldName) {
 
 export async function uploadVerificationDocuments(request, response, next) {
   try {
-    await ensureDriverVerificationNotSubmitted(request.user.id);
+    await ensureDriverVerificationCanBeSubmitted(request.user.id);
     const vehicleImage = getUploadedFile(request.files, 'vehicleImage');
     const identityDocument = getUploadedFile(request.files, 'identityDocument');
     const [vehicleImageUrl, identityDocumentUrl] = await Promise.all([

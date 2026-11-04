@@ -1,16 +1,32 @@
 import AppError from '../../../shared/utils/AppError.js';
 import DriverProfile from '../models/DriverProfile.js';
 
-export async function ensureDriverVerificationNotSubmitted(userId) {
+export async function ensureDriverVerificationCanBeSubmitted(userId) {
   const existingProfile = await DriverProfile.findOne({ userId });
 
-  if (existingProfile) {
+  if (existingProfile && existingProfile.verificationStatus !== 'REJECTED') {
     throw new AppError('Driver verification has already been submitted.', 409);
   }
+
+  return existingProfile;
 }
 
 export async function submitDriverVerification(userId, submission) {
-  await ensureDriverVerificationNotSubmitted(userId);
+  const existingProfile = await ensureDriverVerificationCanBeSubmitted(userId);
+
+  if (existingProfile) {
+    const profile = await DriverProfile.findOneAndUpdate(
+      { _id: existingProfile._id, userId, verificationStatus: 'REJECTED' },
+      { $set: { ...submission, verificationStatus: 'PENDING' } },
+      { new: true, runValidators: true }
+    );
+
+    if (!profile) {
+      throw new AppError('Driver verification status changed before resubmission. Refresh and try again.', 409);
+    }
+
+    return profile;
+  }
 
   try {
     return await DriverProfile.create({

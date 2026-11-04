@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { getRideSocket } from '../lib/rideSocket';
+import { friendlyRideSocketError, getRideSocket } from '../lib/rideSocket';
 
 const ACTIVE_TRACKING_STATUSES = new Set([
   'ACCEPTED',
@@ -36,13 +36,15 @@ export function useRiderRideTracking({ ride, accessToken }) {
     const updateStatus = (update) => {
       if (update.rideId === ride._id) setTrackingStatus(update.status);
     };
-    const reportSocketError = (socketError) => setConnectionError(socketError.message || 'Live tracking connection was interrupted.');
+    const reportSocketError = () => setConnectionError(friendlyRideSocketError());
+    const clearSocketError = () => setConnectionError('');
 
     socket.on('connect', joinRideRoom);
     socket.on('ride:location:update', updateLocation);
     socket.on('ride:accepted', updateStatus);
     socket.on('ride:status:update', updateStatus);
     socket.on('connect_error', reportSocketError);
+    socket.on('connect', clearSocketError);
 
     if (socket.connected) joinRideRoom();
     else socket.connect();
@@ -54,6 +56,7 @@ export function useRiderRideTracking({ ride, accessToken }) {
       socket.off('ride:accepted', updateStatus);
       socket.off('ride:status:update', updateStatus);
       socket.off('connect_error', reportSocketError);
+      socket.off('connect', clearSocketError);
     };
   }, [accessToken, ride?._id, trackingStatus]);
 

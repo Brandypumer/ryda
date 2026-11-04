@@ -11,6 +11,7 @@ import { emitRideAccepted, emitRideDriverDeclined, emitRideStatusUpdate } from '
 import { RYDA_CONFIG } from '../../../shared/constants/rydaConfig.js';
 
 const PAYMENT_GRACE_PERIOD_MS = RYDA_CONFIG.PAYMENT_GRACE_PERIOD_MINUTES * 60 * 1000;
+const REQUEST_EXPIRY_MS = RYDA_CONFIG.RIDE_REQUEST_EXPIRY_MINUTES * 60 * 1000;
 
 const CANCELLABLE_STATUSES = ['REQUESTED', 'ACCEPTED', 'DRIVER_ARRIVING', 'DRIVER_ARRIVED'];
 
@@ -42,6 +43,20 @@ export async function getMyRides(request, response, next) {
   } catch (error) {
     return next(error);
   }
+}
+
+export async function retrySearch(request, response, next) {
+  try {
+    const { id } = request.params;
+    if (!isValidRideId(id)) throw new AppError('Ride not found.', 404);
+    const ride = await Ride.findOneAndUpdate(
+      { _id: id, riderId: request.user.id, status: 'REQUESTED', paymentStatus: 'PAID', driverId: null, proposedDriverId: null, requestExpiresAt: { $lte: new Date() } },
+      { $set: { requestExpiresAt: new Date(Date.now() + REQUEST_EXPIRY_MS) } },
+      { new: true, runValidators: true }
+    );
+    if (!ride) throw new AppError('This ride is not eligible to search again yet.', 409);
+    return response.status(200).json({ ride });
+  } catch (error) { return next(error); }
 }
 
 export async function getRide(request, response, next) {

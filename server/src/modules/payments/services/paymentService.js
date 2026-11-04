@@ -3,6 +3,7 @@ import AppError from '../../../shared/utils/AppError.js';
 import PlatformFeeLiability from '../models/PlatformFeeLiability.js';
 import Payment from '../models/Payment.js';
 import { creditDriverEarningOnce } from './ledgerService.js';
+import { RYDA_CONFIG } from '../../../shared/constants/rydaConfig.js';
 
 const SERVICE_CONFIG = {
   RIDE: { modelName: 'Ride', ownerField: 'riderId', completedStatuses: ['COMPLETED'] },
@@ -84,7 +85,14 @@ export async function settlePayment(payment, paystackData) {
 
   await model.updateOne(
     { _id: paidPayment.serviceId },
-    { $set: { paymentStatus: 'PAID' } }
+    {
+      $set: {
+        paymentStatus: 'PAID',
+        ...(paidPayment.serviceType === 'RIDE'
+          ? { requestExpiresAt: new Date(Date.now() + RYDA_CONFIG.RIDE_REQUEST_EXPIRY_MINUTES * 60 * 1000) }
+          : {})
+      }
+    }
   );
 
   await PlatformFeeLiability.findOneAndUpdate(

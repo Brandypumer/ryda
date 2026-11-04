@@ -8,7 +8,8 @@ import {
   confirmDriver,
   declineDriver,
   getMyRides,
-  getRide
+  getRide,
+  retrySearch
 } from '../controllers/rideRequestController.js';
 import { createRideReview } from '../controllers/rideReviewController.js';
 
@@ -21,5 +22,6 @@ rideRequestRouter.get('/:id', requireAuth, requireRole('RIDER'), getRide);
 rideRequestRouter.patch('/:id/cancel', requireAuth, requireRole('RIDER'), cancelRide);
 rideRequestRouter.post('/:id/confirm-driver', requireAuth, requireRole('RIDER'), confirmDriver);
 rideRequestRouter.post('/:id/decline-driver', requireAuth, requireRole('RIDER'), declineDriver);
+rideRequestRouter.post('/:id/retry-search', requireAuth, requireRole('RIDER'), retrySearch);
 
 export default rideRequestRouter;

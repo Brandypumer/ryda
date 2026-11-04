@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { getRideSocket } from '../lib/rideSocket';
+import { friendlyRideSocketError, getRideSocket } from '../lib/rideSocket';
 
 const ACTIVE_TRACKING_STATUSES = new Set([
   'ACCEPTED',
@@ -33,12 +33,14 @@ export function useRiderRideLocationPublisher({ ride, accessToken, enabled = fal
     const updateStatus = (update) => {
       if (String(update.rideId) === String(ride._id)) setTrackingStatus(update.status);
     };
-    const reportSocketError = (error) => setLocationError(error.message || 'Live location connection was interrupted.');
+    const reportSocketError = () => setLocationError(friendlyRideSocketError());
+    const clearSocketError = () => setLocationError('');
 
     socket.on('connect', joinRideRoom);
     socket.on('ride:accepted', updateStatus);
     socket.on('ride:status:update', updateStatus);
     socket.on('connect_error', reportSocketError);
+    socket.on('connect', clearSocketError);
     if (socket.connected) joinRideRoom();
     else socket.connect();
 
@@ -72,6 +74,7 @@ export function useRiderRideLocationPublisher({ ride, accessToken, enabled = fal
       socket.off('ride:accepted', updateStatus);
       socket.off('ride:status:update', updateStatus);
       socket.off('connect_error', reportSocketError);
+      socket.off('connect', clearSocketError);
     };
   }, [accessToken, canShare, ride?._id]);
 

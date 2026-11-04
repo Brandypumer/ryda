@@ -24,7 +24,21 @@ export async function initializePayment(request, response, next) {
     const amounts = getPaymentAmounts(service);
     const existing = await Payment.findOne({ serviceType, serviceId: service._id, status: 'PENDING' }).sort({ createdAt: -1 });
     if (existing) {
-      return response.status(200).json({ payment: existing, authorizationUrl: null, accessCode: null });
+      if (existing.authorizationUrl) {
+        return response.status(200).json({ payment: existing, authorizationUrl: existing.authorizationUrl, accessCode: null });
+      }
+
+      const retryReference = `RYDA-${serviceType}-${crypto.randomUUID()}`;
+      const retryPaystack = await initializePaystackTransaction({
+        email,
+        amountKobo: Math.round(amounts.grossAmount * 100),
+        reference: retryReference,
+        metadata: { serviceType, serviceId: String(service._id), userId: String(request.user.id) }
+      });
+      existing.reference = retryPaystack.reference || retryReference;
+      existing.authorizationUrl = retryPaystack.authorization_url || '';
+      await existing.save();
+      return response.status(200).json({ payment: existing, authorizationUrl: retryPaystack.authorization_url, accessCode: retryPaystack.access_code });
     }
 
     const reference = `RYDA-${serviceType}-${crypto.randomUUID()}`;
@@ -43,7 +57,8 @@ export async function initializePayment(request, response, next) {
       reference: paystack.reference || reference,
       ...amounts,
       status: 'PENDING',
-      provider: 'PAYSTACK'
+      provider: 'PAYSTACK',
+      authorizationUrl: paystack.authorization_url || ''
     });
 
     return response.status(201).json({

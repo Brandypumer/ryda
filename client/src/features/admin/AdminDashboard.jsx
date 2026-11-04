@@ -46,6 +46,7 @@ export default function AdminDashboard() {
   useEffect(() => { loadDashboard(); }, [loadDashboard]);
 
   async function runAction(key, action) {
+    if (key.startsWith('suspend-') && !window.confirm('Change this driver account suspension state?')) return;
     setBusy(key);
     setMessage('');
     try {
@@ -135,6 +136,10 @@ export default function AdminDashboard() {
 
       <Panel title="Users"><Table headers={['Name', 'Email', 'Role']}>
         {data.users.map((user) => <tr key={user._id}><Cell>{user.fullName || '—'}</Cell><Cell>{user.email}</Cell><Cell>{user.role}</Cell></tr>)}
+      </Table></Panel>
+
+      <Panel title="User suspension controls"><Table headers={['Name', 'Email', 'Role', 'Status', 'Actions']}>
+        {data.users.filter((user) => ['RIDER', 'DRIVER'].includes(user.role)).map((user) => <tr key={user._id}><Cell>{user.fullName || user.email}</Cell><Cell>{user.email}</Cell><Cell>{user.role}</Cell><Cell><StatusBadge status={user.isSuspended ? 'SUSPENDED' : 'ACTIVE'} /></Cell><Cell><ActionButton disabled={busy === `user-suspension-${user._id}`} onClick={() => runAction(`user-suspension-${user._id}`, async () => { if (!user.isSuspended && !window.confirm(`Suspend ${user.fullName || user.email}?`)) return; await api.patch(`/admin/users/${user._id}/suspension`, { suspended: !user.isSuspended }); })}>{user.isSuspended ? 'Reactivate User' : 'Suspend User'}</ActionButton></Cell></tr>)}
       </Table></Panel>
 
       <Panel title="Rides"><RecordTable records={data.rides} fields={['_id', 'status', 'paymentStatus', 'grossFare']} /></Panel>

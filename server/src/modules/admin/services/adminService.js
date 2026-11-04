@@ -12,6 +12,9 @@ const MODEL_NAMES = {
   PlatformFeeLiability: 'PlatformFeeLiability'
 };
 
+const ACTIVE_RIDE_STATUSES = ['ACCEPTED', 'DRIVER_ARRIVING', 'DRIVER_ARRIVED', 'IN_PROGRESS'];
+const ACTIVE_COURIER_STATUSES = ['ACCEPTED', 'PICKED_UP', 'IN_TRANSIT'];
+
 function getModel(name) {
   try {
     return mongoose.model(MODEL_NAMES[name] || name);
@@ -61,14 +64,45 @@ export async function updateDriverSuspension(driverId, isSuspended) {
 
   const DriverProfile = getModel('DriverProfile');
   const id = toObjectId(driverId, 'driverId');
-  const driver = await DriverProfile.findOneAndUpdate(
-    { $or: [{ _id: id }, { userId: id }] },
-    { $set: { isSuspended } },
-    { new: true }
-  );
+  const driver = await DriverProfile.findOne({ $or: [{ _id: id }, { userId: id }] });
 
   if (!driver) throw new AppError('Driver profile was not found.', 404);
-  return driver;
+  await updateUserSuspension(driver.userId, isSuspended);
+  return DriverProfile.findById(driver._id);
+}
+
+export async function updateUserSuspension(userId, isSuspended) {
+  if (typeof isSuspended !== 'boolean') throw new AppError('suspended must be boolean.', 400);
+  const User = getModel('User');
+  const id = toObjectId(userId, 'userId');
+  const user = await User.findById(id).select('role isSuspended');
+  if (!user) throw new AppError('User was not found.', 404);
+  if (user.role === 'ADMIN') throw new AppError('Admin accounts cannot be suspended by this action.', 403);
+
+  if (isSuspended) {
+    const Ride = getModelIfRegistered('Ride');
+    const CourierDelivery = getModelIfRegistered('CourierDelivery');
+    const [rideAssignment, courierAssignment] = await Promise.all([
+      Ride?.exists({ $or: [{ riderId: id }, { driverId: id }], status: { $in: ACTIVE_RIDE_STATUSES } }),
+      CourierDelivery?.exists({ $or: [{ senderId: id }, { driverId: id }], status: { $in: ACTIVE_COURIER_STATUSES } })
+    ]);
+    if (rideAssignment || courierAssignment) {
+      throw new AppError('User has an active assignment. Complete or cancel it before suspension.', 409);
+    }
+  }
+
+  const updated = await User.findOneAndUpdate(
+    { _id: id, role: { $in: ['RIDER', 'DRIVER'] } },
+    { $set: { isSuspended } },
+    { new: true, runValidators: true }
+  ).select('-passwordHash');
+  if (!updated) throw new AppError('Only Rider or Driver accounts may be suspended.', 403);
+
+  if (updated.role === 'DRIVER') {
+    const DriverProfile = getModelIfRegistered('DriverProfile');
+    if (DriverProfile) await DriverProfile.updateOne({ userId: id }, { $set: { isSuspended } });
+  }
+  return updated;
 }
 
 export async function getDashboardSummary() {

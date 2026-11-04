@@ -5,6 +5,8 @@ import { requireRole } from '../../../shared/middleware/roleGuard.js';
 import {
   cancelRide,
   createRide,
+  confirmDriver,
+  declineDriver,
   getMyRides,
   getRide
 } from '../controllers/rideRequestController.js';
@@ -17,5 +19,7 @@ rideRequestRouter.get('/my', requireAuth, requireRole('RIDER'), getMyRides);
 rideRequestRouter.post('/:id/review', requireAuth, requireRole('RIDER'), createRideReview);
 rideRequestRouter.get('/:id', requireAuth, requireRole('RIDER'), getRide);
 rideRequestRouter.patch('/:id/cancel', requireAuth, requireRole('RIDER'), cancelRide);
+rideRequestRouter.post('/:id/confirm-driver', requireAuth, requireRole('RIDER'), confirmDriver);
+rideRequestRouter.post('/:id/decline-driver', requireAuth, requireRole('RIDER'), declineDriver);
 
 export default rideRequestRouter;

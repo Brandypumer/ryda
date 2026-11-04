@@ -53,7 +53,7 @@ function AccountSummary() {
 }
 
 export function ApplicationSidebar() {
-  return <aside aria-label="Application navigation" className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white lg:flex"><div className="flex min-h-screen flex-col px-4 py-5"><NavLink aria-label="RYDA home" className="px-2" to="/"><BrandMark /></NavLink><p className="px-2 pb-4 pt-7 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Workspace</p><NavItems /><div className="mt-auto space-y-4 px-2"><AccountSummary /><LogoutButton className="w-full" /></div></div></aside>;
+  return <aside aria-label="Application navigation" className="fixed inset-y-0 left-0 z-30 hidden h-screen w-64 flex-col border-r border-slate-200 bg-white lg:flex"><div className="flex h-full min-h-0 flex-col px-4 py-5"><NavLink aria-label="RYDA home" className="px-2" to="/"><BrandMark /></NavLink><p className="px-2 pb-4 pt-7 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Workspace</p><div className="min-h-0 flex-1 overflow-y-auto"><NavItems /></div><div className="mt-4 shrink-0 space-y-4 px-2"><AccountSummary /><LogoutButton className="w-full" /></div></div></aside>;
 }
 
 export function ApplicationTopBar() {

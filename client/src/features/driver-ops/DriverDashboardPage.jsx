@@ -81,6 +81,11 @@ export function ActiveAssignmentCard({ assignment }) {
   );
 }
 
+export function PendingProposalCard({ proposal }) {
+  if (!proposal) return null;
+  return <article className="rounded-lg border border-amber-200 bg-amber-50 p-4"><h3 className="font-semibold text-amber-950">Ride offer pending</h3><p className="mt-2 text-sm text-amber-900">Waiting for the rider to confirm your offer. The ride will appear here as an active assignment after confirmation.</p><p className="mt-2 text-sm text-slate-700"><span className="font-medium">Pickup:</span> {locationLabel(proposal.pickup)}</p><p className="mt-1 text-sm text-slate-700"><span className="font-medium">Destination:</span> {locationLabel(proposal.dropoff)}</p></article>;
+}
+
 export function RequestFeed({ requests, loading, acceptingId, onAccept }) {
   if (loading) return <p className="text-sm text-slate-600">Loading available requests…</p>;
   if (!requests.length) return <p className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-600">No ride or courier requests are available right now.</p>;
@@ -98,7 +103,7 @@ export function RequestFeed({ requests, loading, acceptingId, onAccept }) {
           {request.serviceType === 'RIDE' && (request.isPrivateRide || request.bookedSeats === 4) && <p className="mt-2 text-sm font-semibold text-indigo-800">Private Keke</p>}
           {request.serviceType === 'COURIER' && (request.recipientName || request.packageDescription) && <p className="mt-2 text-sm text-slate-700"><span className="font-medium">Courier:</span> {[request.recipientName, request.packageDescription].filter(Boolean).join(' · ')}</p>}
           {typeof (request.fare ?? request.grossFare) === 'number' && <p className="mt-3 text-sm font-semibold text-slate-900">Fare: {amount(request.fare ?? request.grossFare)}</p>}
-          <button type="button" disabled={Boolean(acceptingId)} onClick={() => onAccept(request)} className="mt-4 rounded-lg bg-indigo-700 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-60">{acceptingId === request.id ? 'Accepting…' : `Accept ${request.serviceType}`}</button>
+          <button type="button" disabled={Boolean(acceptingId)} onClick={() => onAccept(request)} className="mt-4 rounded-lg bg-indigo-700 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-60">{acceptingId === request.id ? (request.serviceType === 'RIDE' ? 'Offering…' : 'Accepting…') : request.serviceType === 'RIDE' ? 'Offer Ride' : `Accept ${request.serviceType}`}</button>
         </article>
       ))}
     </div>
@@ -218,10 +223,10 @@ export default function DriverDashboardPage() {
     setFeedback('');
     try {
       await api.post(endpoint);
-      setFeedback(`${request.serviceType} request accepted. Your dashboard has been refreshed.`);
+      setFeedback(request.serviceType === 'RIDE' ? 'Ride offer sent. Waiting for rider confirmation.' : `${request.serviceType} request accepted. Your dashboard has been refreshed.`);
       await loadDashboard();
     } catch (acceptError) {
-      setRequestError(getErrorMessage(acceptError, `Unable to accept this ${request.serviceType.toLowerCase()} request.`));
+      setRequestError(getErrorMessage(acceptError, request.serviceType === 'RIDE' ? 'Unable to offer this ride.' : `Unable to accept this ${request.serviceType.toLowerCase()} request.`));
     } finally {
       setAcceptingId('');
     }
@@ -275,6 +280,7 @@ export default function DriverDashboardPage() {
         <section className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold">Active assignment</h2><p className="mt-1 text-sm text-slate-600">Only your current Ride or Courier delivery is shown here.</p></div></div>
           <ActiveAssignmentCard assignment={dashboard.activeAssignment} />
+          <PendingProposalCard proposal={dashboard.pendingProposal} />
           {dashboard.assignmentConflict && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">This driver has conflicting active assignments. Complete or resolve one before accepting another request.</p>}
           {dashboard.activeAssignment?.serviceType === 'RIDE' && <>
             <DriverRideLocationPublisher

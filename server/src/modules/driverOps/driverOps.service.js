@@ -118,9 +118,10 @@ export async function buildDashboard(driverId) {
     Promise.resolve(getCourierModel()),
     Promise.resolve(getWalletModel())
   ]);
-  const [activeRide, activeCourier, completedRides, completedCourier, wallet, activeAssignments] = await Promise.all([
+  const [activeRide, activeCourier, pendingProposal, completedRides, completedCourier, wallet, activeAssignments] = await Promise.all([
     findOneActive(Ride, driverId, ACTIVE_RIDE_STATUSES),
     findOneActive(CourierDelivery, driverId, ACTIVE_COURIER_STATUSES),
+    Ride ? Ride.findOne({ proposedDriverId: driverId, status: 'REQUESTED' }).sort({ driverProposedAt: -1 }).lean() : null,
     Ride ? Ride.countDocuments({ driverId, status: 'COMPLETED' }) : null,
     CourierDelivery ? CourierDelivery.countDocuments({ driverId, status: 'DELIVERED' }) : null,
     DriverWallet ? DriverWallet.findOne({ driverId }).lean() : null,
@@ -133,6 +134,7 @@ export async function buildDashboard(driverId) {
     availability: { isOnline: profile.isOnline, isSuspended: profile.isSuspended },
     verificationStatus: profile.verificationStatus,
     activeAssignment: active[0] || null,
+    pendingProposal: pendingProposal ? assignment('RIDE', pendingProposal) : null,
     activeAssignments: active,
     assignmentConflict: active.length > 1,
     completed: { rides: completedRides, courier: completedCourier },
@@ -173,7 +175,7 @@ export async function getAvailableRequests(driverId) {
 
   const [Ride, CourierDelivery] = [getRideModel(), getCourierModel()];
   const [rides, courier] = await Promise.all([
-    Ride ? Ride.find({ status: 'REQUESTED', paymentStatus: 'PAID', driverId: null }).sort({ createdAt: 1 }).lean() : [],
+    Ride ? Ride.find({ status: 'REQUESTED', paymentStatus: 'PAID', driverId: null, proposedDriverId: null }).sort({ createdAt: 1 }).lean() : [],
     CourierDelivery ? CourierDelivery.find({ status: 'REQUESTED', driverId: null }).sort({ createdAt: 1 }).lean() : []
   ]);
 

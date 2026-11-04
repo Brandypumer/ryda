@@ -37,6 +37,15 @@ const rideSchema = new mongoose.Schema(
       ref: 'User',
       default: null
     },
+    proposedDriverId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    driverProposedAt: {
+      type: Date,
+      default: null
+    },
     bookedSeats: {
       type: Number,
       required: true,

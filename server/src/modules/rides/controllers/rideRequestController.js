@@ -2,8 +2,15 @@ import mongoose from 'mongoose';
 
 import AppError from '../../../shared/utils/AppError.js';
 import { waiveServicePlatformFeeLiability } from '../../payments/services/liabilityService.js';
+import { ensureServicePlatformFeeLiability } from '../../payments/services/liabilityService.js';
+import Payment from '../../payments/models/Payment.js';
+import { assertNoActiveAssignment } from '../../../shared/services/activeAssignmentService.js';
+import { assertDriverEligible } from '../services/driverEligibility.js';
 import { Ride } from '../models/Ride.js';
-import { emitRideStatusUpdate } from '../sockets/rideTrackingSocket.js';
+import { emitRideAccepted, emitRideDriverDeclined, emitRideStatusUpdate } from '../sockets/rideTrackingSocket.js';
+import { RYDA_CONFIG } from '../../../shared/constants/rydaConfig.js';
+
+const PAYMENT_GRACE_PERIOD_MS = RYDA_CONFIG.PAYMENT_GRACE_PERIOD_MINUTES * 60 * 1000;
 
 const CANCELLABLE_STATUSES = ['REQUESTED', 'ACCEPTED', 'DRIVER_ARRIVING', 'DRIVER_ARRIVED'];
 
@@ -29,7 +36,7 @@ export async function createRide(request, response, next) {
 
 export async function getMyRides(request, response, next) {
   try {
-    const rides = await Ride.find({ riderId: request.user.id }).sort({ createdAt: -1 });
+    const rides = await Ride.find({ riderId: request.user.id }).populate('proposedDriverId', 'fullName role').sort({ createdAt: -1 });
 
     return response.status(200).json({ rides });
   } catch (error) {
@@ -45,7 +52,7 @@ export async function getRide(request, response, next) {
       throw new AppError('Ride not found.', 404);
     }
 
-    const ride = await Ride.findOne({ _id: id, riderId: request.user.id });
+    const ride = await Ride.findOne({ _id: id, riderId: request.user.id }).populate('proposedDriverId', 'fullName role');
     if (!ride) {
       throw new AppError('Ride not found.', 404);
     }
@@ -64,7 +71,7 @@ export async function cancelRide(request, response, next) {
       throw new AppError('Ride not found.', 404);
     }
 
-    const ride = await Ride.findOne({ _id: id, riderId: request.user.id }).select('status driverId paymentStatus');
+    const ride = await Ride.findOne({ _id: id, riderId: request.user.id }).select('status driverId proposedDriverId paymentStatus');
     if (!ride) {
       throw new AppError('Ride not found.', 404);
     }
@@ -87,7 +94,7 @@ export async function cancelRide(request, response, next) {
 
     const cancelledRide = await Ride.findOneAndUpdate(
       { _id: id, riderId: request.user.id, status: ride.status },
-      { $set: { status: 'CANCELLED' } },
+      { $set: { status: 'CANCELLED' }, $unset: { proposedDriverId: 1, driverProposedAt: 1 } },
       { new: true, runValidators: true }
     );
 
@@ -114,4 +121,42 @@ export async function cancelRide(request, response, next) {
   } catch (error) {
     return next(error);
   }
+}
+
+export async function confirmDriver(request, response, next) {
+  try {
+    const { id } = request.params;
+    if (!isValidRideId(id)) throw new AppError('Ride not found.', 404);
+    const pending = await Ride.findOne({ _id: id, riderId: request.user.id, status: 'REQUESTED', paymentStatus: 'PAID' }).select('proposedDriverId');
+    if (!pending?.proposedDriverId) throw new AppError('There is no driver offer waiting for this ride.', 409);
+    const driverId = pending.proposedDriverId.toString();
+    await assertDriverEligible(driverId);
+    await assertNoActiveAssignment(driverId, 'RIDE');
+    const acceptedAt = new Date();
+    const ride = await Ride.findOneAndUpdate(
+      { _id: id, riderId: request.user.id, status: 'REQUESTED', paymentStatus: 'PAID', driverId: null, proposedDriverId: driverId },
+      { $set: { driverId, status: 'ACCEPTED', acceptedAt, paymentDeadlineAt: new Date(acceptedAt.getTime() + PAYMENT_GRACE_PERIOD_MS) }, $unset: { proposedDriverId: 1, driverProposedAt: 1 } },
+      { new: true, runValidators: true }
+    );
+    if (!ride) throw new AppError('The driver offer changed before confirmation. Please refresh and try again.', 409);
+    await Payment.updateMany({ serviceType: 'RIDE', serviceId: ride._id, driverId: null }, { $set: { driverId: ride.driverId } });
+    try { await ensureServicePlatformFeeLiability({ serviceType: 'RIDE', service: ride }); } catch (_error) { return next(new AppError('Ride was accepted, but its platform-fee liability could not be recorded.', 503)); }
+    emitRideAccepted(ride);
+    return response.status(200).json({ ride });
+  } catch (error) { return next(error); }
+}
+
+export async function declineDriver(request, response, next) {
+  try {
+    const { id } = request.params;
+    if (!isValidRideId(id)) throw new AppError('Ride not found.', 404);
+    const ride = await Ride.findOneAndUpdate(
+      { _id: id, riderId: request.user.id, status: 'REQUESTED', proposedDriverId: { $ne: null } },
+      { $unset: { proposedDriverId: 1, driverProposedAt: 1 } },
+      { new: true, runValidators: true }
+    );
+    if (!ride) throw new AppError('There is no driver offer waiting for this ride.', 409);
+    emitRideDriverDeclined(ride);
+    return response.status(200).json({ ride });
+  } catch (error) { return next(error); }
 }

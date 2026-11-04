@@ -3,12 +3,13 @@ import { Link, useNavigate } from 'react-router-dom';
 import AuthLayout from '../components/AuthLayout';
 import PasswordField from '../components/PasswordField';
 import { useAuth } from '../hooks/AuthContext';
+import { getRoleDestination } from '../roleDestination';
 
 const INITIAL_VALUES = { email: '', password: '' };
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { login, isRestoring } = useAuth();
+  const { login, isRestoring, user } = useAuth();
   const [values, setValues] = useState(INITIAL_VALUES);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -24,8 +25,8 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      await login(values);
-      navigate('/');
+      const loggedInUser = await login(values);
+      navigate(getRoleDestination(loggedInUser?.role || user?.role));
     } catch (loginError) {
       setError(loginError.message);
     } finally {

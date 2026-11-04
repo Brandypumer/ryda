@@ -128,13 +128,26 @@ export function emitRideStatusUpdate(ride) {
   emitRideEvent('ride:status:update', ride);
 }
 
-function emitRideEvent(event, ride) {
+export function emitRideDriverProposed(ride, proposedDriver) {
+  emitRideEvent('ride:driver-proposed', ride, {
+    proposedDriverId: proposedDriver?._id?.toString() || ride.proposedDriverId?.toString() || null,
+    proposedDriver: proposedDriver ? { fullName: proposedDriver.fullName, role: proposedDriver.role } : null
+  });
+}
+
+export function emitRideDriverDeclined(ride) {
+  emitRideEvent('ride:driver-declined', ride);
+}
+
+function emitRideEvent(event, ride, extra = {}) {
   if (!rideIO || !ride?._id) return;
 
   rideIO.to(rideRoom(ride._id.toString())).emit(event, {
     rideId: ride._id.toString(),
     status: ride.status,
     driverId: ride.driverId?.toString() || null,
+    proposedDriverId: ride.proposedDriverId?.toString() || null,
+    ...extra,
     timestamp: new Date().toISOString()
   });
 }
@@ -162,7 +175,7 @@ async function findRide(rideId) {
     throw new Error('Ride not found.');
   }
 
-  const ride = await Ride.findById(rideId).select('riderId driverId status');
+  const ride = await Ride.findById(rideId).select('riderId driverId proposedDriverId status');
   if (!ride) throw new Error('Ride not found.');
   return ride;
 }

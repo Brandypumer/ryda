@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import AuthLayout from '../components/AuthLayout';
 import PasswordField from '../components/PasswordField';
 import { useAuth } from '../hooks/AuthContext';
+import { getRoleDestination } from '../roleDestination';
 
 const INITIAL_VALUES = {
   fullName: '',
@@ -14,7 +15,7 @@ const INITIAL_VALUES = {
 
 export default function RegisterPage() {
   const navigate = useNavigate();
-  const { register } = useAuth();
+  const { register, user } = useAuth();
   const [values, setValues] = useState(INITIAL_VALUES);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -30,8 +31,8 @@ export default function RegisterPage() {
     setIsSubmitting(true);
 
     try {
-      await register(values);
-      navigate('/');
+      const registeredUser = await register(values);
+      navigate(getRoleDestination(registeredUser?.role || user?.role || values.role));
     } catch (registrationError) {
       setError(registrationError.message);
     } finally {

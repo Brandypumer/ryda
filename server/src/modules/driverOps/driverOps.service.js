@@ -11,11 +11,11 @@ import { findActiveAssignments } from '../../shared/services/activeAssignmentSer
 const ACTIVE_RIDE_STATUSES = ['ACCEPTED', 'DRIVER_ARRIVING', 'DRIVER_ARRIVED', 'IN_PROGRESS'];
 const ACTIVE_COURIER_STATUSES = ['ACCEPTED', 'PICKED_UP', 'IN_TRANSIT'];
 
-async function getProfile(driverId) {
+async function getProfile(driverId, { required = true } = {}) {
   const DriverProfile = getDriverProfileModel();
   const profile = await DriverProfile.findOne({ userId: driverId }).lean();
 
-  if (!profile) {
+  if (!profile && required) {
     throw new AppError('Driver profile was not found.', 404);
   }
 
@@ -117,7 +117,13 @@ async function findOneActive(Model, driverId, statuses) {
 }
 
 export async function buildDashboard(driverId) {
-  const profile = await getProfile(driverId);
+  const profile = await getProfile(driverId, { required: false });
+  if (!profile || profile.verificationStatus !== 'APPROVED') {
+    return {
+      verificationStatus: profile?.verificationStatus || null,
+      rejectionReason: profile?.rejectionReason || null
+    };
+  }
   const [liabilities, Ride, CourierDelivery, DriverWallet] = await Promise.all([
     getLiabilitySummary(driverId),
     Promise.resolve(getRideModel()),

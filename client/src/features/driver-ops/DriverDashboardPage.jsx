@@ -167,8 +167,31 @@ export function DashboardSummaries({ dashboard }) {
   );
 }
 
+function DriverVerificationState({ status, rejectionReason, onRefresh }) {
+  const content = status === 'PENDING'
+    ? { title: 'Your account is awaiting verification.', description: 'An administrator will review your driver verification. Check back here for an update.', action: 'View verification' }
+    : status === 'REJECTED'
+      ? { title: 'Your verification needs attention.', description: 'Update the requested information and submit again.', action: 'Resubmit verification' }
+      : { title: 'Complete your driver verification', description: 'Submit your verification details before you can go online and accept rides.', action: 'Complete verification' };
+
+  return (
+    <main className="mx-auto max-w-3xl space-y-5 p-4 sm:p-6">
+      <p className="text-sm font-semibold uppercase tracking-wide text-indigo-700">Driver verification</p>
+      <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-6" role="status">
+        <h1 className="text-2xl font-bold text-slate-950">{content.title}</h1>
+        {status === 'REJECTED' && rejectionReason && <p className="text-sm text-slate-700">{rejectionReason}</p>}
+        <p className="text-slate-600">{content.description}</p>
+        <div className="flex flex-wrap gap-3">
+          <Link className="rounded-lg bg-indigo-700 px-4 py-2 font-semibold text-white hover:bg-indigo-800" to="/driver-verification">{content.action}</Link>
+          <button className="rounded-lg border border-slate-300 px-4 py-2 font-semibold text-slate-700" type="button" onClick={onRefresh}>Refresh status</button>
+        </div>
+      </section>
+    </main>
+  );
+}
+
 export default function DriverDashboardPage() {
-  const { token, user } = useAuth();
+  const { token, user, isRestoring } = useAuth();
   const [dashboard, setDashboard] = useState(null);
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -202,8 +225,15 @@ export default function DriverDashboardPage() {
     setError('');
     try {
       const response = await api.get('/driver/dashboard');
-      setDashboard(response.data?.dashboard || null);
-      await loadRequests();
+      const nextDashboard = response.data?.dashboard;
+      if (!nextDashboard) throw new Error('Dashboard response is unavailable.');
+      setDashboard(nextDashboard);
+      setRequestError('');
+      if (nextDashboard.verificationStatus === 'APPROVED' && nextDashboard.availability?.isOnline && !eligibilityMessage(nextDashboard)) {
+        await loadRequests();
+      } else {
+        setRequests([]);
+      }
     } catch (dashboardError) {
       setDashboard(null);
       setRequests([]);
@@ -213,7 +243,11 @@ export default function DriverDashboardPage() {
     }
   }, [loadRequests]);
 
-  useEffect(() => { loadDashboard(); }, [loadDashboard]);
+  useEffect(() => {
+    if (isRestoring) return;
+    if (token && user?.role === 'DRIVER') loadDashboard();
+    else setLoading(false);
+  }, [isRestoring, loadDashboard, token, user?.role]);
 
   useEffect(() => {
     setDriverLocation(null);
@@ -260,8 +294,16 @@ export default function DriverDashboardPage() {
     }
   }
 
-  if (loading) {
+  if (loading || isRestoring) {
     return <main className="mx-auto max-w-6xl p-6" aria-busy="true"><p className="text-slate-600">Loading driver dashboard…</p></main>;
+  }
+
+  if (!token || user?.role !== 'DRIVER') {
+    return <main className="mx-auto max-w-3xl p-6"><p>The driver dashboard is available to driver accounts.</p>{!token && <Link className="mt-3 inline-block font-semibold text-indigo-700 underline" to="/login">Log in</Link>}</main>;
+  }
+
+  if (dashboard && dashboard.verificationStatus !== 'APPROVED') {
+    return <DriverVerificationState status={dashboard.verificationStatus} rejectionReason={dashboard.rejectionReason} onRefresh={loadDashboard} />;
   }
 
   return (

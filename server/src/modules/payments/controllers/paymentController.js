@@ -29,25 +29,20 @@ export async function initializePayment(request, response, next) {
     }
     if (service.paymentStatus === 'PAID') throw new AppError('This service has already been paid.', 409);
     const amounts = getPaymentAmounts(service);
-    const existing = await Payment.findOne({ serviceType, serviceId: service._id, status: 'PENDING' }).sort({ createdAt: -1 });
-    if (existing) {
-      if (existing.authorizationUrl) {
-        return response.status(200).json({ payment: existing, authorizationUrl: existing.authorizationUrl, accessCode: null });
+    const pendingPayments = await Payment.find({ serviceType, serviceId: service._id, userId: request.user.id, status: 'PENDING' }).sort({ createdAt: -1 });
+    for (const existing of pendingPayments) {
+      // Checkout may have succeeded even if the browser never returned to Ryda.
+      const transaction = await verifyPaystackTransaction(existing.reference);
+      if (transaction.status === 'success') {
+        const result = await settlePayment(existing, transaction);
+        return response.status(200).json({ payment: result.payment, authorizationUrl: null, accessCode: null, alreadyVerified: true });
       }
-
-      const retryReference = `RYDA-${serviceType}-${crypto.randomUUID()}`;
-      const retryPaystack = await initializePaystackTransaction({
-        email,
-        amountKobo: ngnToKobo(amounts.grossAmount),
-        reference: retryReference,
-        metadata: { serviceType, serviceId: String(service._id), userId: String(request.user.id) },
-        callbackUrl
-      });
-      existing.reference = retryPaystack.reference || retryReference;
-      existing.authorizationUrl = retryPaystack.authorization_url || '';
-      await existing.save();
-      return response.status(200).json({ payment: existing, authorizationUrl: retryPaystack.authorization_url, accessCode: retryPaystack.access_code });
     }
+    const existing = pendingPayments[0];
+    if (existing?.authorizationUrl) {
+      return response.status(200).json({ payment: existing, authorizationUrl: existing.authorizationUrl, accessCode: null });
+    }
+    // Keep previous references verifiable when creating another attempt.
 
     const reference = `RYDA-${serviceType}-${crypto.randomUUID()}`;
     const paystack = await initializePaystackTransaction({
@@ -83,8 +78,16 @@ export async function initializePayment(request, response, next) {
 export async function verifyPayment(request, response, next) {
   try {
     const { reference } = request.params;
-    const payment = await Payment.findOne({ reference, userId: request.user.id });
+    let payment = await Payment.findOne({ reference, userId: request.user.id });
     if (!payment) throw new AppError('Payment reference was not found.', 404);
+    if (payment.status !== 'PAID') {
+      payment = await Payment.findOne({
+        serviceType: payment.serviceType,
+        serviceId: payment.serviceId,
+        userId: request.user.id,
+        status: 'PAID'
+      }) || payment;
+    }
     if (payment.status === 'PAID') {
       const result = await reconcilePaidPayment(payment);
       return response.status(200).json({ payment: result.payment, earning: result.earning, alreadyVerified: true });

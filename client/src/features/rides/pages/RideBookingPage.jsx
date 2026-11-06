@@ -6,6 +6,7 @@ import { api } from '../../../shared/lib/api';
 import { useAuth } from '../../identity';
 import RideTrackingMap from '../components/RideTrackingMap';
 import { getRideSocket } from '../lib/rideSocket';
+import { calculateDistanceKm, DEMO_DISTANCE_ERROR, isNigeriaFeature, MAX_DEMO_RIDE_DISTANCE_KM } from '../lib/rideLocation';
 
 const ACTIVE_RIDE_STATUSES = new Set(['REQUESTED', 'ACCEPTED', 'DRIVER_ARRIVING', 'DRIVER_ARRIVED', 'IN_PROGRESS']);
 const TRACKING_STATUSES = new Set(['ACCEPTED', 'DRIVER_ARRIVING', 'DRIVER_ARRIVED', 'IN_PROGRESS']);
@@ -97,6 +98,7 @@ function RideHub() {
     if (!pickup.address.trim() || !destination.address.trim()) return setBookingError('Select both a pickup location and destination.');
     if (!Number.isInteger(bookedSeats) || bookedSeats < 1 || bookedSeats > capacity) return setBookingError(`Choose between 1 and ${capacity} seats.`);
     if (!hasValidCoordinates(pickup) || !hasValidCoordinates(destination)) return setBookingError('Select a suggested pickup and destination so we can locate your ride.');
+    if (calculateDistanceKm(Number(pickup.latitude), Number(pickup.longitude), Number(destination.latitude), Number(destination.longitude)) > MAX_DEMO_RIDE_DISTANCE_KM + 1e-9) return setBookingError(DEMO_DISTANCE_ERROR);
     setIsSubmitting(true);
     try {
       const response = await api.post('/rides', {
@@ -152,46 +154,59 @@ function ActiveRidePanel({ ride, accessToken, onPaymentStatusChange, onCancelled
     try { const { data } = await api.post(`/rides/${ride._id}/${action}`); onRideUpdated(data.ride); }
     catch (error) { setActionError(error.response?.data?.message || 'Unable to update this ride. Please refresh and try again.'); }
   }
-  return <article className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200"><div className="border-b border-slate-100 p-5 sm:p-7"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm font-semibold uppercase tracking-wide text-emerald-700">Active ride</p><h1 className="mt-1 text-2xl font-bold text-slate-950">{statusCopy[ride.status] || 'Ride update'}</h1></div><StatusBadge status={ride.status} /></div><dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4"><Detail label="Pickup" value={ride.pickup?.address || 'Pickup details unavailable'} /><Detail label="Destination" value={ride.destination?.address || 'Destination details unavailable'} /><Detail label="Seats" value={`${ride.bookedSeats || 1} ${ride.bookedSeats === 1 ? 'seat' : 'seats'}${privateRide ? ' · Private Keke' : ''}`} /><Detail label="Fare" value={formatNaira(ride.grossFare)} />{ride.paymentStatus && <Detail label="Payment" value={ride.paymentStatus} />}</dl></div><div className="space-y-4 p-5 sm:p-7">{ride.paymentStatus !== 'PAID' && <RidePaymentPanel ride={ride} onPaymentStatusChange={onPaymentStatusChange} />}{ride.proposedDriverId && ride.status === 'REQUESTED' && <section className="rounded-xl border border-sky-200 bg-sky-50 p-4"><h2 className="font-semibold text-sky-950">Driver found</h2><p className="mt-1 text-sm text-sky-900">{ride.proposedDriver?.fullName || 'A verified driver'} wants to take your ride.</p><div className="mt-3 flex flex-wrap gap-2"><button className="rounded-lg bg-sky-700 px-3 py-2 text-sm font-semibold text-white" onClick={() => respondToDriver('confirm-driver')} type="button">Accept Driver</button><button className="rounded-lg border border-sky-300 bg-white px-3 py-2 text-sm font-semibold text-sky-800" onClick={() => respondToDriver('decline-driver')} type="button">Decline</button></div></section>}{ride.paymentStatus === 'PAID' && ride.status === 'REQUESTED' && !ride.proposedDriverId && <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">Payment paid. Looking for a driver...</p>}{canCancel && <RideCancellationPanel ride={ride} onCancelled={onCancelled} />}{ride.status === 'REQUESTED' && ride.paymentStatus !== 'PAID' && <p className="text-sm text-slate-600">Complete payment before a driver can accept this ride.</p>}{ride.status === 'REQUESTED' && <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">Your pickup and destination are shown below while the request is open.</p>}<RideTrackingMap key={ride._id} ride={ride} accessToken={accessToken} shareRiderLocation={TRACKING_STATUSES.has(ride.status)} /></div></article>;
+  return <article className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200"><div className="border-b border-slate-100 p-5 sm:p-7"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm font-semibold uppercase tracking-wide text-emerald-700">Active ride</p><h1 className="mt-1 text-2xl font-bold text-slate-950">{statusCopy[ride.status] || 'Ride update'}</h1></div><StatusBadge status={ride.status} /></div><dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4"><Detail label="Pickup" value={ride.pickup?.address || 'Pickup details unavailable'} /><Detail label="Destination" value={ride.destination?.address || 'Destination details unavailable'} /><Detail label="Seats" value={`${ride.bookedSeats || 1} ${ride.bookedSeats === 1 ? 'seat' : 'seats'}${privateRide ? ' · Private Keke' : ''}`} /><Detail label="Fare" value={formatNaira(ride.grossFare)} />{ride.paymentStatus && <Detail label="Payment" value={ride.paymentStatus} />}</dl></div><div className="space-y-4 p-5 sm:p-7">{ride.paymentStatus !== 'PAID' && <RidePaymentPanel ride={ride} onPaymentStatusChange={onPaymentStatusChange} />}{ride.proposedDriverId && ride.status === 'REQUESTED' && <section className="rounded-xl border border-sky-200 bg-sky-50 p-4"><h2 className="font-semibold text-sky-950">Driver found</h2><p className="mt-1 text-sm text-sky-900">{ride.proposedDriver?.fullName || 'A verified driver'} wants to take your ride.</p><div className="mt-3 flex flex-wrap gap-2"><button className="rounded-lg bg-sky-700 px-3 py-2 text-sm font-semibold text-white" onClick={() => respondToDriver('confirm-driver')} type="button">Accept Driver</button><button className="rounded-lg border border-sky-300 bg-white px-3 py-2 text-sm font-semibold text-sky-800" onClick={() => respondToDriver('decline-driver')} type="button">Decline</button></div></section>}{ride.paymentStatus === 'PAID' && ride.status === 'REQUESTED' && !ride.proposedDriverId && <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">Payment confirmed. Looking for a driver...</p>}{canCancel && <RideCancellationPanel ride={ride} onCancelled={onCancelled} />}{ride.status === 'REQUESTED' && ride.paymentStatus !== 'PAID' && <p className="text-sm text-slate-600">Complete payment before a driver can accept this ride.</p>}{ride.status === 'REQUESTED' && <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">Your pickup and destination are shown below while the request is open.</p>}<RideTrackingMap key={ride._id} ride={ride} accessToken={accessToken} shareRiderLocation={TRACKING_STATUSES.has(ride.status)} /></div></article>;
 }
 
 function RidePaymentPanel({ ride, onPaymentStatusChange }) {
   const [payment, setPayment] = useState(null);
   const [authorizationUrl, setAuthorizationUrl] = useState('');
   const [message, setMessage] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const callbackHandled = useRef(false);
+  const [isSubmitting, setIsSubmitting] = useState(true);
+  const paymentStatusChangeRef = useRef(onPaymentStatusChange);
+  paymentStatusChangeRef.current = onPaymentStatusChange;
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const callbackReference = params.get('reference') || params.get('trxref');
-    if (!callbackReference || callbackHandled.current) return undefined;
-
-    callbackHandled.current = true;
     let cancelled = false;
     setIsSubmitting(true);
-    setMessage('Confirming your Paystack payment...');
+    if (callbackReference) setPayment({ reference: callbackReference });
+    setMessage('Checking for an existing ride payment...');
 
-    async function verifyReturnedPayment() {
+    async function restorePayment() {
       try {
-        const { data } = await api.get(`/payments/verify/${encodeURIComponent(callbackReference)}`);
+        const history = await api.get('/payments/history');
         if (cancelled) return;
-        await onPaymentStatusChange(data.payment?.status || 'PAID');
-        setMessage('Ride payment confirmed. Looking for a driver.');
+        const attempts = (history.data.payments || []).filter((item) => item.serviceType === 'RIDE' && String(item.serviceId) === String(ride._id));
+        const existing = attempts.find((item) => item.status === 'PAID')
+          || attempts.find((item) => item.reference === callbackReference)
+          || attempts.find((item) => item.status === 'PENDING');
+        const reference = existing?.reference || callbackReference;
+        if (!reference) { setMessage(''); return; }
+        setPayment(existing || { reference });
+        setAuthorizationUrl(existing?.authorizationUrl || '');
+        setMessage('Confirming your Paystack payment...');
+        const { data } = await api.get(`/payments/verify/${encodeURIComponent(reference)}`);
+        if (cancelled) return;
+        if (data.payment?.serviceType !== 'RIDE' || String(data.payment.serviceId) !== String(ride._id)) {
+          throw new Error('The returned payment belongs to a different booking.');
+        }
+        if (data.payment.status !== 'PAID') throw new Error('Payment is not verified yet. Use Verify payment / Retry.');
         const cleanUrl = new URL(window.location.href);
         cleanUrl.searchParams.delete('reference');
         cleanUrl.searchParams.delete('trxref');
         window.history.replaceState({}, document.title, `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`);
+        await paymentStatusChangeRef.current('PAID');
       } catch (error) {
-        if (!cancelled) setMessage(error.response?.data?.message || 'Payment is not verified yet. Use Verify payment / Retry.');
+        if (!cancelled) setMessage(error.response?.data?.message || error.message || 'Payment is not verified yet. Use Verify payment / Retry.');
       } finally {
         if (!cancelled) setIsSubmitting(false);
       }
     }
 
-    verifyReturnedPayment();
+    restorePayment();
     return () => { cancelled = true; };
-  }, [onPaymentStatusChange]);
+  }, [ride._id]);
 
   async function initializePayment() {
     setIsSubmitting(true);
@@ -216,11 +231,15 @@ function RidePaymentPanel({ ride, onPaymentStatusChange }) {
     setIsSubmitting(true);
     setMessage('');
     try {
-      await api.get(`/payments/verify/${encodeURIComponent(payment.reference)}`);
-      await onPaymentStatusChange('PAID');
+      const { data } = await api.get(`/payments/verify/${encodeURIComponent(payment.reference)}`);
+      if (data.payment?.serviceType !== 'RIDE' || String(data.payment.serviceId) !== String(ride._id)) {
+        throw new Error('The returned payment belongs to a different booking.');
+      }
+      if (data.payment.status !== 'PAID') throw new Error('Payment is not verified yet. You can retry after completing checkout.');
+      await onPaymentStatusChange(data.payment.status);
       setMessage('Ride payment verified.');
     } catch (error) {
-      setMessage(error.response?.data?.message || 'Payment is not verified yet. You can retry after completing checkout.');
+      setMessage(error.response?.data?.message || error.message || 'Payment is not verified yet. You can retry after completing checkout.');
     } finally {
       setIsSubmitting(false);
     }
@@ -273,10 +292,14 @@ function LocationFields({ label, placeholder, location, onChange }) {
     const timer = window.setTimeout(async () => {
       setLoading(true); setError('');
       try {
-        const response = await fetch(`https://api.heigit.org/pelias/v1/autocomplete?api_key=${encodeURIComponent(apiKey)}&text=${encodeURIComponent(query.trim())}&size=5`, { signal: controller.signal });
+        const params = new URLSearchParams({ api_key: apiKey, text: query.trim(), size: '5', 'boundary.country': 'NGA' });
+        const response = await fetch(`https://api.heigit.org/pelias/v1/autocomplete?${params}`, { signal: controller.signal });
         if (!response.ok) throw new Error('Location search unavailable.');
         const data = await response.json();
-        setSuggestions(Array.isArray(data.features) ? data.features : []);
+        if (controller.signal.aborted) return;
+        const results = Array.isArray(data.features) ? data.features.filter(isNigeriaFeature) : [];
+        setSuggestions(results);
+        if (!results.length) setError('No matching locations in Nigeria. Try another address.');
       } catch (requestError) { if (requestError.name !== 'AbortError') setError('Location search unavailable.'); }
       finally { setLoading(false); }
     }, 350);
@@ -284,22 +307,29 @@ function LocationFields({ label, placeholder, location, onChange }) {
   }, [apiKey, query]);
 
   function selectFeature(feature) {
+    if (!isNigeriaFeature(feature)) return;
     const [longitude, latitude] = feature.geometry?.coordinates || [];
     if (!Number.isFinite(Number(latitude)) || !Number.isFinite(Number(longitude))) return;
     const address = feature.properties?.label || feature.properties?.name || query.trim();
     setQuery(address); setSuggestions([]); onChange('address', address); onChange('latitude', Number(latitude)); onChange('longitude', Number(longitude));
   }
 
-  function editAddress(event) { setQuery(event.target.value); onChange('address', event.target.value); onChange('latitude', ''); onChange('longitude', ''); }
+  function editAddress(event) { setQuery(event.target.value); setSuggestions([]); onChange('address', event.target.value); onChange('latitude', ''); onChange('longitude', ''); }
   function useCurrentLocation() {
     if (!navigator.geolocation) { setError('Location permission is off. Search for your pickup location instead.'); return; }
+    if (!apiKey) { setError('Location search is unavailable. Please try again when it is configured.'); return; }
     navigator.geolocation.getCurrentPosition(async ({ coords }) => {
-      onChange('latitude', coords.latitude); onChange('longitude', coords.longitude); setError('');
+      setError('');
       try {
-        const response = await fetch(`https://api.heigit.org/pelias/v1/reverse?api_key=${encodeURIComponent(apiKey)}&point.lat=${coords.latitude}&point.lon=${coords.longitude}`);
-        const data = await response.json(); const address = data.features?.[0]?.properties?.label || 'Current location';
-        setQuery(address); onChange('address', address);
-      } catch (_error) { setQuery('Current location'); onChange('address', 'Current location'); }
+        const params = new URLSearchParams({ api_key: apiKey, 'point.lat': String(coords.latitude), 'point.lon': String(coords.longitude) });
+        const response = await fetch(`https://api.heigit.org/pelias/v1/reverse?${params}`);
+        if (!response.ok) throw new Error('Unable to confirm your current location. Search for a pickup in Nigeria.');
+        const data = await response.json();
+        const feature = data.features?.[0];
+        if (!isNigeriaFeature(feature)) throw new Error('Choose a pickup location in Nigeria for the RYDA demo.');
+        const address = feature.properties?.label || 'Current location';
+        setQuery(address); onChange('address', address); onChange('latitude', coords.latitude); onChange('longitude', coords.longitude);
+      } catch (locationError) { setQuery(''); setSuggestions([]); onChange('address', ''); onChange('latitude', ''); onChange('longitude', ''); setError(locationError.message || 'Unable to confirm your current location. Search for a pickup in Nigeria.'); }
     }, () => setError('Location permission is off. Search for your pickup location instead.'));
   }
 

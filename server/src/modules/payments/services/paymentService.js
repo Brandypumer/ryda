@@ -105,21 +105,22 @@ export async function settlePayment(payment, paystackData) {
   const authoritativeAmounts = getPaymentAmounts(service);
   const amountKobo = ngnToKobo(authoritativeAmounts.grossAmount);
   const verifiedAmountKobo = Number(paystackData?.amount);
-  if (
-    !paystackData ||
-    paystackData.reference !== payment.reference ||
-    !Number.isInteger(verifiedAmountKobo) || verifiedAmountKobo !== amountKobo ||
-    String(paystackData.currency || '').trim().toUpperCase() !== 'NGN'
-  ) {
-    throw new AppError('The verified Paystack amount does not match this service.', 400);
+  if (paystackData?.status !== 'success') throw new AppError('Paystack has not marked this transaction successful.', 409);
+  if (paystackData.reference !== payment.reference) throw new AppError('The verified Paystack reference does not match this payment.', 400);
+  if (String(paystackData.currency || '').trim().toUpperCase() !== 'NGN') {
+    throw new AppError('The verified Paystack currency is not NGN. This payment cannot be applied to the booking.', 400);
+  }
+  if (!Number.isInteger(verifiedAmountKobo) || verifiedAmountKobo !== amountKobo) {
+    throw new AppError(`Paystack returned ${Number.isFinite(verifiedAmountKobo) ? verifiedAmountKobo : 'an invalid amount of'} kobo; this booking requires ${amountKobo} kobo. Payment has not been marked PAID.`, 400);
   }
   if (payment.grossAmount !== authoritativeAmounts.grossAmount) {
     throw new AppError('The payment record does not match the service fare.', 409);
   }
 
+  const paidAt = new Date(paystackData.paid_at || Date.now());
   const paidPayment = await Payment.findOneAndUpdate(
     { _id: payment._id, status: { $ne: 'PAID' } },
-    { $set: { status: 'PAID', paidAt: new Date() } },
+    { $set: { status: 'PAID', paidAt: Number.isNaN(paidAt.getTime()) ? new Date() : paidAt } },
     { new: true }
   ) || await Payment.findById(payment._id);
 

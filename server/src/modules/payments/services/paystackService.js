@@ -40,6 +40,7 @@ export function initializePaystackTransaction({ email, amountKobo, reference, me
     body: JSON.stringify({
       email,
       amount: amountKobo,
+      currency: 'NGN',
       reference,
       metadata,
       ...(callbackUrl ? { callback_url: callbackUrl } : {})

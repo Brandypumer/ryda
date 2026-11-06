@@ -6,6 +6,7 @@ import { ensureServicePlatformFeeLiability } from '../../payments/services/liabi
 import Payment from '../../payments/models/Payment.js';
 import { assertNoActiveAssignment } from '../../../shared/services/activeAssignmentService.js';
 import { assertDriverEligible } from '../services/driverEligibility.js';
+import { assertRideWithinDemoArea } from '../services/rideLocation.js';
 import { Ride } from '../models/Ride.js';
 import { emitRideAccepted, emitRideDriverDeclined, emitRideStatusUpdate } from '../sockets/rideTrackingSocket.js';
 import { RYDA_CONFIG } from '../../../shared/constants/rydaConfig.js';
@@ -22,6 +23,7 @@ function isValidRideId(id) {
 export async function createRide(request, response, next) {
   try {
     const { pickup, destination, bookedSeats } = request.body;
+    assertRideWithinDemoArea(pickup, destination);
     const ride = await Ride.create({
       riderId: request.user.id,
       pickup,

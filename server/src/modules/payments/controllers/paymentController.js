@@ -14,15 +14,14 @@ const FAILED_PROVIDER_STATUSES = new Set(['failed', 'abandoned']);
 
 async function inspectRidePaymentAttempt(payment) {
   const transaction = await verifyPaystackTransaction(payment.reference);
-  if (transaction.status !== 'success') {
-    // Temporary demo diagnostics: never log the full provider response.
-    console.info('Paystack payment verification', {
-      reference: payment.reference,
-      status: transaction.status,
-      amount: transaction.amount,
-      currency: transaction.currency
-    });
-  }
+  // Safe provider diagnostics only: never log credentials or payment instrument data.
+  console.info('Paystack payment verification', {
+    status: transaction.status,
+    reference: transaction.reference,
+    amount: transaction.amount,
+    requested_amount: transaction.requested_amount,
+    currency: transaction.currency
+  });
   if (transaction.reference !== payment.reference) throw new AppError('The verified Paystack reference does not match this payment.', 400);
   if (FAILED_PROVIDER_STATUSES.has(transaction.status)) {
     payment = await Payment.findOneAndUpdate(

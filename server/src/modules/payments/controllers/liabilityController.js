@@ -5,6 +5,9 @@ import { initializePaystackTransaction, verifyPaystackTransaction } from '../ser
 import { getDriverFinancialEligibility } from '../services/liabilityService.js';
 import PlatformFeeLiability from '../models/PlatformFeeLiability.js';
 import { ngnToKobo } from '../services/paymentService.js';
+import User from '../../identity/models/User.js';
+
+const FAILED_PROVIDER_STATUSES = new Set(['failed', 'abandoned']);
 
 export async function listDriverLiabilities(request, response, next) {
   try {
@@ -17,7 +20,7 @@ export async function listDriverLiabilities(request, response, next) {
 
 export async function settleDriverLiability(request, response, next) {
   try {
-    const { liabilityId, reference, email } = request.body;
+    const { liabilityId, reference } = request.body;
     const eligibility = await getDriverFinancialEligibility(request.user.id);
     const liability = eligibility.liabilities.find((item) => String(item._id) === String(liabilityId));
 
@@ -39,13 +42,19 @@ export async function settleDriverLiability(request, response, next) {
         });
       }
     }
+    if (liability.status === 'SETTLED') {
+      return response.status(200).json({ liability, eligibility });
+    }
     if (liability.status !== 'OVERDUE') {
       throw new AppError('Only overdue liabilities can be settled.', 409);
     }
 
     if (!reference) {
-      const payerEmail = email || request.user.email;
-      if (!payerEmail || typeof payerEmail !== 'string') throw new AppError('A valid payment email is required.', 400);
+      const user = await User.findById(request.user.id).select('email role');
+      const payerEmail = user?.email?.trim();
+      if (user?.role !== 'DRIVER' || !payerEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payerEmail)) {
+        throw new AppError('Your RYDA account must have a valid email before settling a platform fee.', 400);
+      }
 
       const existingPayment = await Payment.findOne({
         userId: request.user.id,
@@ -55,7 +64,14 @@ export async function settleDriverLiability(request, response, next) {
         status: 'PENDING'
       }).sort({ createdAt: -1 });
       if (existingPayment) {
-        return response.status(200).json({ payment: existingPayment, liability, authorizationUrl: null, accessCode: null });
+        const existingTransaction = await verifyPaystackTransaction(existingPayment.reference);
+        if (existingTransaction.status === 'success') {
+          return settleDriverLiability({ ...request, body: { liabilityId, reference: existingPayment.reference } }, response, next);
+        }
+        if (!FAILED_PROVIDER_STATUSES.has(existingTransaction.status)) {
+          return response.status(200).json({ payment: existingPayment, liability, authorizationUrl: existingPayment.authorizationUrl || null, accessCode: null });
+        }
+        await Payment.updateOne({ _id: existingPayment._id, status: 'PENDING' }, { $set: { status: 'FAILED', authorizationUrl: '' } });
       }
 
       const paymentReference = `RYDA-FEE-${crypto.randomUUID()}`;
@@ -106,7 +122,10 @@ export async function settleDriverLiability(request, response, next) {
       if (paystack.status !== 'success' || paystack.reference !== payment.reference) {
         throw new AppError('Paystack has not verified this fee settlement.', 409);
       }
-      if (Number(paystack.amount) !== ngnToKobo(liability.amount) || String(paystack.currency || '').trim().toUpperCase() !== 'NGN') {
+      const expectedKobo = ngnToKobo(liability.amount);
+      const requestedAmount = Number(paystack.requested_amount);
+      const verifiedAmount = Number.isFinite(requestedAmount) ? requestedAmount : Number(paystack.amount);
+      if (verifiedAmount !== expectedKobo || String(paystack.currency || '').trim().toUpperCase() !== 'NGN') {
         throw new AppError('The verified fee settlement amount does not match the liability.', 400);
       }
 
@@ -118,7 +137,7 @@ export async function settleDriverLiability(request, response, next) {
     }
 
     const settled = await PlatformFeeLiability.findOneAndUpdate(
-      { _id: liability._id, driverId: request.user.id, status: 'OVERDUE' },
+      { _id: liability._id, driverId: request.user.id, status: { $in: ['PENDING', 'OVERDUE'] } },
       { $set: { status: 'SETTLED', settledAt: new Date() } },
       { new: true }
     );

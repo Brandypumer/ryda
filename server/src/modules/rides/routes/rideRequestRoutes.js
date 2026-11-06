@@ -9,6 +9,7 @@ import {
   declineDriver,
   getMyRides,
   getRide,
+  getRideDriverProfile,
   retrySearch
 } from '../controllers/rideRequestController.js';
 import { createRideReview } from '../controllers/rideReviewController.js';
@@ -18,6 +19,7 @@ const rideRequestRouter = Router();
 rideRequestRouter.post('/', requireAuth, requireRole('RIDER'), createRide);
 rideRequestRouter.get('/my', requireAuth, requireRole('RIDER'), getMyRides);
 rideRequestRouter.post('/:id/review', requireAuth, requireRole('RIDER'), createRideReview);
+rideRequestRouter.get('/:id/driver-profile', requireAuth, requireRole('RIDER'), getRideDriverProfile);
 rideRequestRouter.get('/:id', requireAuth, requireRole('RIDER'), getRide);
 rideRequestRouter.patch('/:id/cancel', requireAuth, requireRole('RIDER'), cancelRide);
 rideRequestRouter.post('/:id/confirm-driver', requireAuth, requireRole('RIDER'), confirmDriver);

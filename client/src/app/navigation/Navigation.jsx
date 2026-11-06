@@ -87,7 +87,7 @@ export default function Navigation() {
 
           <div className="hidden items-center gap-2 lg:flex">
             <ThemeQuickToggle />
-            <AppearanceButton compact />
+            <AppearanceButton />
             {isAuthenticated ? (
               <>
                 <NavLink className={({ isActive }) => `max-w-40 truncate rounded-lg px-3 py-2 text-sm font-medium ${isActive ? 'bg-ryda-50 text-ryda-800' : 'text-slate-700 hover:bg-slate-50 hover:text-slate-950'}`} to="/profile">{user?.fullName || 'Profile'}</NavLink>

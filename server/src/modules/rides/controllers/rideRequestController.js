@@ -8,6 +8,9 @@ import { assertNoActiveAssignment } from '../../../shared/services/activeAssignm
 import { assertDriverEligible } from '../services/driverEligibility.js';
 import { assertRideWithinDemoArea } from '../services/rideLocation.js';
 import { Ride } from '../models/Ride.js';
+import { Review } from '../models/Review.js';
+import User from '../../identity/models/User.js';
+import DriverProfile from '../../identity/models/DriverProfile.js';
 import { emitRideAccepted, emitRideDriverDeclined, emitRideStatusUpdate } from '../sockets/rideTrackingSocket.js';
 import { RYDA_CONFIG } from '../../../shared/constants/rydaConfig.js';
 
@@ -78,6 +81,23 @@ export async function getRide(request, response, next) {
   } catch (error) {
     return next(error);
   }
+}
+
+export async function getRideDriverProfile(request, response, next) {
+  try {
+    const { id } = request.params;
+    if (!isValidRideId(id)) throw new AppError('Ride not found.', 404);
+    const ride = await Ride.findOne({ _id: id, riderId: request.user.id }).select('driverId proposedDriverId');
+    const driverId = ride?.driverId || ride?.proposedDriverId;
+    if (!driverId) throw new AppError('No driver profile is available for this ride yet.', 404);
+    const [user, driver, rating] = await Promise.all([
+      User.findById(driverId).select('fullName profileImage role'),
+      DriverProfile.findOne({ userId: driverId }).select('vehicleType vehicleNumber averageRating completedRides verificationStatus'),
+      Review.aggregate([{ $match: { driverId: new mongoose.Types.ObjectId(driverId) } }, { $group: { _id: '$driverId', averageRating: { $avg: '$rating' }, reviewCount: { $sum: 1 } } }])
+    ]);
+    if (!user || user.role !== 'DRIVER') throw new AppError('Driver profile was not found.', 404);
+    return response.status(200).json({ profile: { ...user.toObject(), driver: driver?.toObject() || null, averageRating: rating[0]?.averageRating || driver?.averageRating || 0, reviewCount: rating[0]?.reviewCount || 0 } });
+  } catch (error) { return next(error); }
 }
 
 export async function cancelRide(request, response, next) {

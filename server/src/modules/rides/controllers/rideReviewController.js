@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import AppError from '../../../shared/utils/AppError.js';
 import { Ride } from '../models/Ride.js';
 import { Review } from '../models/Review.js';
+import DriverProfile from '../../identity/models/DriverProfile.js';
 
 export async function createRideReview(request, response, next) {
   try {
@@ -41,7 +42,16 @@ export async function createRideReview(request, response, next) {
       comment
     });
 
-    return response.status(201).json({ review });
+    const [summary] = await Review.aggregate([
+      { $match: { driverId: ride.driverId } },
+      { $group: { _id: '$driverId', averageRating: { $avg: '$rating' }, reviewCount: { $sum: 1 } } }
+    ]);
+    await DriverProfile.updateOne(
+      { userId: ride.driverId },
+      { $set: { averageRating: summary?.averageRating || rating } }
+    );
+
+    return response.status(201).json({ review, averageRating: summary?.averageRating || rating, reviewCount: summary?.reviewCount || 1 });
   } catch (error) {
     if (error?.code === 11000) {
       return next(new AppError('You have already reviewed this ride.', 409));

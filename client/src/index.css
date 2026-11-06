@@ -157,7 +157,8 @@
 }
 
 .appearance-backdrop { position: fixed; inset: 0; z-index: 60; display: flex; justify-content: flex-end; background: rgb(15 23 42 / 42%); animation: appearance-fade-in 180ms ease-out both; }
-.appearance-panel { width: min(100%, 28rem); height: 100%; overflow: hidden; background: var(--color-surface); color: var(--color-text); box-shadow: -1rem 0 3rem var(--color-shadow); animation: appearance-slide-in 220ms ease-out both; outline: none; }
+.appearance-panel { display: flex; flex-direction: column; width: min(100%, 28rem); height: 100%; overflow: hidden; background: var(--color-surface); color: var(--color-text); box-shadow: -1rem 0 3rem var(--color-shadow); animation: appearance-slide-in 220ms ease-out both; outline: none; }
+.appearance-panel > div:last-child { min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; }
 .appearance-panel button { color: inherit; }
 @keyframes appearance-fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes appearance-slide-in { from { opacity: .7; transform: translateX(2rem); } to { opacity: 1; transform: translateX(0); } }

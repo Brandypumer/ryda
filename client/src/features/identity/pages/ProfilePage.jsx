@@ -3,6 +3,7 @@ import { Link, Navigate } from 'react-router-dom';
 import LogoutButton from '../components/LogoutButton';
 import { getAuthError, getMyDriverVerification } from '../api/authApi';
 import { useAuth } from '../hooks/AuthContext';
+import { ThemeSelector } from '../../../shared/theme';
 
 const VERIFICATION_STYLES = {
   PENDING: 'bg-amber-50 text-amber-800 ring-amber-200',
@@ -221,6 +222,7 @@ export default function ProfilePage() {
           </div>
         </aside>
       </div>
+      <ThemeSelector />
     </main>
   );
 }

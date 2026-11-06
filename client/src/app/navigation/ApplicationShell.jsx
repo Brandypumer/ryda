@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { LogoutButton, useAuth } from '../../features/identity';
 import { BrandMark } from '../../shared/ui';
+import { AppearanceButton, ThemeQuickToggle } from '../../shared/theme';
 
 const linksByRole = {
   RIDER: [
@@ -53,12 +54,12 @@ function AccountSummary() {
 }
 
 export function ApplicationSidebar() {
-  return <aside aria-label="Application navigation" className="fixed inset-y-0 left-0 z-30 hidden h-screen w-64 flex-col border-r border-slate-200 bg-white lg:flex"><div className="flex h-full min-h-0 flex-col px-4 py-5"><NavLink aria-label="RYDA home" className="px-2" to="/"><BrandMark /></NavLink><p className="px-2 pb-4 pt-7 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Workspace</p><div className="min-h-0 flex-1 overflow-y-auto"><NavItems /></div><div className="mt-4 shrink-0 space-y-4 px-2"><AccountSummary /><LogoutButton className="w-full" /></div></div></aside>;
+  return <aside aria-label="Application navigation" className="fixed inset-y-0 left-0 z-30 hidden h-screen w-64 flex-col border-r border-slate-200 bg-white lg:flex"><div className="flex h-full min-h-0 flex-col px-4 py-5"><NavLink aria-label="RYDA home" className="px-2" to="/"><BrandMark /></NavLink><p className="px-2 pb-4 pt-7 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Workspace</p><div className="min-h-0 flex-1 overflow-y-auto"><NavItems /></div><div className="mt-4 shrink-0 space-y-3 px-2"><AccountSummary /><div className="flex gap-2"><ThemeQuickToggle /><AppearanceButton /></div><LogoutButton className="w-full" /></div></div></aside>;
 }
 
 export function ApplicationTopBar() {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
-  return <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur lg:hidden"><div className="flex min-h-16 items-center justify-between px-4 sm:px-6"><NavLink aria-label="RYDA home" to="/"><BrandMark /></NavLink><MenuButton onClick={() => setOpen((value) => !value)} open={open} /></div>{open && <nav aria-label="Application navigation" className="border-t border-slate-200 px-4 py-3 sm:px-6" id="app-navigation"><div className="pb-3"><p className="truncate text-sm font-semibold text-slate-900">{user?.fullName || 'RYDA account'}</p><p className="mt-0.5 text-xs text-slate-500"><RoleLabel role={user?.role} /></p></div><NavItems mobile onNavigate={close} /><div className="mt-3 border-t border-slate-200 pt-3"><LogoutButton className="w-full" /></div></nav>}</header>;
+  return <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur lg:hidden"><div className="flex min-h-16 items-center justify-between px-4 sm:px-6"><NavLink aria-label="RYDA home" to="/"><BrandMark /></NavLink><div className="flex gap-2"><ThemeQuickToggle /><AppearanceButton compact /><MenuButton onClick={() => setOpen((value) => !value)} open={open} /></div></div>{open && <nav aria-label="Application navigation" className="border-t border-slate-200 px-4 py-3 sm:px-6" id="app-navigation"><div className="pb-3"><p className="truncate text-sm font-semibold text-slate-900">{user?.fullName || 'RYDA account'}</p><p className="mt-0.5 text-xs text-slate-500"><RoleLabel role={user?.role} /></p></div><NavItems mobile onNavigate={close} /><div className="mt-3 border-t border-slate-200 pt-3"><LogoutButton className="w-full" /></div></nav>}</header>;
 }

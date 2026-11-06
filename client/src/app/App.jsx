@@ -25,7 +25,7 @@ export default function App() {
         <ApplicationSidebar />
         <div className="min-w-0 flex-1 lg:pl-64">
           <ApplicationTopBar />
-          <main className="min-w-0 py-6 sm:py-8 lg:py-10">
+          <main className="page-transition min-w-0 py-6 sm:py-8 lg:py-10">
             <PageContainer className="max-w-7xl"><AppRoutes /></PageContainer>
           </main>
         </div>
@@ -36,7 +36,7 @@ export default function App() {
   return (
     <div className="app-shell">
       <Navigation />
-      <main className="flex-1 py-6 sm:py-8 lg:py-10">
+      <main className="page-transition flex-1 py-6 sm:py-8 lg:py-10">
         <PageContainer>
           <AppRoutes />
         </PageContainer>

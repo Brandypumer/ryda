@@ -9,6 +9,16 @@
     <title>RYDA — Campus Rides &amp; Courier</title>
   </head>
   <body>
+    <script>
+      (() => {
+        try {
+          const preference = localStorage.getItem('ryda.theme') || 'system';
+          const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          document.documentElement.dataset.theme = preference === 'system' ? (dark ? 'dark-plus' : 'light-plus') : preference;
+          document.documentElement.dataset.themePreference = preference;
+        } catch (_) {}
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

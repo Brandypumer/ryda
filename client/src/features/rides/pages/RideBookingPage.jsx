@@ -160,10 +160,21 @@ function ActiveRidePanel({ ride, accessToken, onPaymentStatusChange, onCancelled
 function RidePaymentPanel({ ride, onPaymentStatusChange }) {
   const [payment, setPayment] = useState(null);
   const [authorizationUrl, setAuthorizationUrl] = useState('');
+  const [retryAllowed, setRetryAllowed] = useState(false);
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(true);
   const paymentStatusChangeRef = useRef(onPaymentStatusChange);
   paymentStatusChangeRef.current = onPaymentStatusChange;
+
+  function handlePaymentError(error, fallback) {
+    const details = error.response?.data;
+    if (details?.payment?.serviceType === 'RIDE' && String(details.payment.serviceId) === String(ride._id)) {
+      setPayment(details.payment);
+      setRetryAllowed(details.retryAllowed === true);
+      setAuthorizationUrl(details.retryAllowed ? '' : details.payment.authorizationUrl || '');
+    }
+    setMessage(details?.message || error.message || fallback);
+  }
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -180,11 +191,13 @@ function RidePaymentPanel({ ride, onPaymentStatusChange }) {
         const attempts = (history.data.payments || []).filter((item) => item.serviceType === 'RIDE' && String(item.serviceId) === String(ride._id));
         const existing = attempts.find((item) => item.status === 'PAID')
           || attempts.find((item) => item.reference === callbackReference)
-          || attempts.find((item) => item.status === 'PENDING');
+          || attempts.find((item) => item.status === 'PENDING')
+          || attempts.find((item) => item.status === 'FAILED');
         const reference = existing?.reference || callbackReference;
         if (!reference) { setMessage(''); return; }
         setPayment(existing || { reference });
-        setAuthorizationUrl(existing?.authorizationUrl || '');
+        setRetryAllowed(existing?.status === 'FAILED');
+        setAuthorizationUrl(existing?.status === 'FAILED' ? '' : existing?.authorizationUrl || '');
         setMessage('Confirming your Paystack payment...');
         const { data } = await api.get(`/payments/verify/${encodeURIComponent(reference)}`);
         if (cancelled) return;
@@ -198,7 +211,7 @@ function RidePaymentPanel({ ride, onPaymentStatusChange }) {
         window.history.replaceState({}, document.title, `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`);
         await paymentStatusChangeRef.current('PAID');
       } catch (error) {
-        if (!cancelled) setMessage(error.response?.data?.message || error.message || 'Payment is not verified yet. Use Verify payment / Retry.');
+        if (!cancelled) handlePaymentError(error, 'Payment is not verified yet. Use Verify payment / Retry.');
       } finally {
         if (!cancelled) setIsSubmitting(false);
       }
@@ -215,12 +228,15 @@ function RidePaymentPanel({ ride, onPaymentStatusChange }) {
       const { data } = await api.post('/payments/initialize', { serviceType: 'RIDE', serviceId: ride._id });
       setPayment(data.payment);
       setAuthorizationUrl(data.authorizationUrl || '');
+      setRetryAllowed(false);
       if (data.payment?.status === 'PAID' || data.alreadyVerified) {
         await onPaymentStatusChange('PAID');
         setMessage('Ride payment is already confirmed.');
-      } else if (!data.authorizationUrl) setMessage('A pending payment already exists. Finish checkout and verify it here.');
+      } else if (data.authorizationUrl) {
+        window.location.assign(data.authorizationUrl);
+      } else setMessage('A pending payment already exists. Finish checkout and verify it here.');
     } catch (error) {
-      setMessage(error.response?.data?.message || 'Unable to start payment. Please try again.');
+      handlePaymentError(error, 'Unable to start payment. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -239,13 +255,36 @@ function RidePaymentPanel({ ride, onPaymentStatusChange }) {
       await onPaymentStatusChange(data.payment.status);
       setMessage('Ride payment verified.');
     } catch (error) {
-      setMessage(error.response?.data?.message || error.message || 'Payment is not verified yet. You can retry after completing checkout.');
+      handlePaymentError(error, 'Payment is not verified yet. You can retry after completing checkout.');
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  return <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-4" aria-label="Ride payment"><h2 className="font-semibold text-emerald-950">Pay for your ride</h2><p className="mt-1 text-sm text-emerald-900">Payment status: {ride.paymentStatus || 'PENDING'}</p><p className="mt-1 text-sm text-emerald-900">Complete payment before a driver can accept this ride.</p><p className="mt-2 text-sm leading-6 text-emerald-950">For your safety and transaction traceability, make payments only through RYDA. Payments made outside RYDA cannot be verified through our platform and are not covered by RYDA payment records or dispute support.</p>{message && <p className="mt-3 text-sm text-emerald-900" role="status">{message}</p>}{!payment ? <button className="mt-3 rounded-lg bg-emerald-700 px-4 py-2 font-semibold text-white disabled:bg-emerald-300" disabled={isSubmitting} onClick={initializePayment} type="button">{isSubmitting ? 'Starting payment...' : `Pay ${formatNaira(ride.grossFare)}`}</button> : <div className="mt-3 space-y-2"><p className="text-sm text-emerald-900">Reference: {payment.reference}</p>{authorizationUrl && <a className="block text-sm font-medium text-emerald-800 underline" href={authorizationUrl} rel="noreferrer" target="_blank">Open Paystack checkout</a>}<button className="rounded-lg bg-emerald-700 px-4 py-2 font-semibold text-white disabled:bg-emerald-300" disabled={isSubmitting} onClick={verifyPayment} type="button">{isSubmitting ? 'Checking payment...' : 'Verify payment / Retry'}</button><button className="rounded-lg border border-emerald-700 px-4 py-2 font-semibold text-emerald-800" disabled={isSubmitting} onClick={initializePayment} type="button">Retry payment</button></div>}</section>;
+  return (
+    <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-4" aria-label="Ride payment">
+      <h2 className="font-semibold text-emerald-950">Pay for your ride</h2>
+      <p className="mt-1 text-sm text-emerald-900">Payment status: {payment?.status || ride.paymentStatus || 'PENDING'}</p>
+      <p className="mt-1 text-sm text-emerald-900">Complete payment before a driver can accept this ride.</p>
+      <p className="mt-2 text-sm leading-6 text-emerald-950">{OFF_PLATFORM_PAYMENT_WARNING}</p>
+      {message && <p className="mt-3 text-sm text-emerald-900" role="status">{message}</p>}
+      {!payment ? (
+        <button className="mt-3 rounded-lg bg-emerald-700 px-4 py-2 font-semibold text-white disabled:bg-emerald-300" disabled={isSubmitting} onClick={initializePayment} type="button">{isSubmitting ? 'Checking payment...' : `Pay ${formatNaira(ride.grossFare)}`}</button>
+      ) : (
+        <div className="mt-3 space-y-2">
+          <p className="text-sm text-emerald-900">Reference: {payment.reference}</p>
+          {retryAllowed ? (
+            <button className="rounded-lg bg-emerald-700 px-4 py-2 font-semibold text-white disabled:bg-emerald-300" disabled={isSubmitting} onClick={initializePayment} type="button">{isSubmitting ? 'Starting payment...' : 'Retry payment'}</button>
+          ) : (
+            <>
+              {authorizationUrl && <a className="block text-sm font-medium text-emerald-800 underline" href={authorizationUrl} rel="noreferrer" target="_blank">Open Paystack checkout</a>}
+              <button className="rounded-lg bg-emerald-700 px-4 py-2 font-semibold text-white disabled:bg-emerald-300" disabled={isSubmitting} onClick={verifyPayment} type="button">{isSubmitting ? 'Checking payment...' : 'Verify payment'}</button>
+            </>
+          )}
+        </div>
+      )}
+    </section>
+  );
 }
 
 function RideCancellationPanel({ ride, onCancelled }) {

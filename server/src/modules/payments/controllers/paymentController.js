@@ -10,6 +10,44 @@ function normalizeServiceType(value) {
   return typeof value === 'string' ? value.trim().toUpperCase() : value;
 }
 
+const FAILED_PROVIDER_STATUSES = new Set(['failed', 'abandoned']);
+
+async function inspectRidePaymentAttempt(payment) {
+  const transaction = await verifyPaystackTransaction(payment.reference);
+  if (transaction.status !== 'success') {
+    // Temporary demo diagnostics: never log the full provider response.
+    console.info('Paystack payment verification', {
+      reference: payment.reference,
+      status: transaction.status,
+      amount: transaction.amount,
+      currency: transaction.currency
+    });
+  }
+  if (transaction.reference !== payment.reference) throw new AppError('The verified Paystack reference does not match this payment.', 400);
+  if (FAILED_PROVIDER_STATUSES.has(transaction.status)) {
+    payment = await Payment.findOneAndUpdate(
+      { _id: payment._id, status: { $in: ['PENDING', 'FAILED'] } },
+      { $set: { status: 'FAILED', authorizationUrl: '' } },
+      { new: true }
+    ) || await Payment.findById(payment._id);
+    if (!payment) throw new AppError('Payment reference was not found.', 404);
+  }
+  return { payment, transaction };
+}
+
+function sendUnpaidPayment(response, { payment, transaction }) {
+  const retryAllowed = FAILED_PROVIDER_STATUSES.has(transaction.status);
+  return response.status(409).json({
+    payment,
+    paymentStatus: payment.status,
+    providerStatus: transaction.status,
+    retryAllowed,
+    message: retryAllowed
+      ? 'Payment was not completed. Retry payment.'
+      : 'Payment is not confirmed yet. Finish checkout or verify again.'
+  });
+}
+
 export async function initializePayment(request, response, next) {
   try {
     const serviceType = normalizeServiceType(request.body.serviceType);
@@ -29,19 +67,31 @@ export async function initializePayment(request, response, next) {
     }
     if (service.paymentStatus === 'PAID') throw new AppError('This service has already been paid.', 409);
     const amounts = getPaymentAmounts(service);
-    const pendingPayments = await Payment.find({ serviceType, serviceId: service._id, userId: request.user.id, status: 'PENDING' }).sort({ createdAt: -1 });
-    for (const existing of pendingPayments) {
+    const attempts = await Payment.find({ serviceType, serviceId: service._id, userId: request.user.id, status: serviceType === 'RIDE' ? { $in: ['PENDING', 'FAILED'] } : 'PENDING' }).sort({ createdAt: -1 });
+    let reusablePayment = null;
+    let unresolvedAttempt = null;
+    for (const existing of attempts) {
       // Checkout may have succeeded even if the browser never returned to Ryda.
-      const transaction = await verifyPaystackTransaction(existing.reference);
-      if (transaction.status === 'success') {
-        const result = await settlePayment(existing, transaction);
+      const inspection = serviceType === 'RIDE'
+        ? await inspectRidePaymentAttempt(existing)
+        : { payment: existing, transaction: await verifyPaystackTransaction(existing.reference) };
+      const { payment, transaction } = inspection;
+      if (payment.status === 'PAID') {
+        const result = await reconcilePaidPayment(payment);
         return response.status(200).json({ payment: result.payment, authorizationUrl: null, accessCode: null, alreadyVerified: true });
       }
+      if (transaction.status === 'success') {
+        const result = await settlePayment(payment, transaction);
+        return response.status(200).json({ payment: result.payment, authorizationUrl: null, accessCode: null, alreadyVerified: true });
+      }
+      if (serviceType === 'RIDE' && FAILED_PROVIDER_STATUSES.has(transaction.status)) continue;
+      reusablePayment ||= payment;
+      unresolvedAttempt ||= inspection;
     }
-    const existing = pendingPayments[0];
-    if (existing?.authorizationUrl) {
-      return response.status(200).json({ payment: existing, authorizationUrl: existing.authorizationUrl, accessCode: null });
+    if (reusablePayment?.authorizationUrl) {
+      return response.status(200).json({ payment: reusablePayment, authorizationUrl: reusablePayment.authorizationUrl, accessCode: null });
     }
+    if (serviceType === 'RIDE' && unresolvedAttempt) return sendUnpaidPayment(response, unresolvedAttempt);
     // Keep previous references verifiable when creating another attempt.
 
     const reference = `RYDA-${serviceType}-${crypto.randomUUID()}`;
@@ -93,7 +143,19 @@ export async function verifyPayment(request, response, next) {
       return response.status(200).json({ payment: result.payment, earning: result.earning, alreadyVerified: true });
     }
 
-    const paystack = await verifyPaystackTransaction(reference);
+    let paystack;
+    if (payment.serviceType === 'RIDE') {
+      const inspection = await inspectRidePaymentAttempt(payment);
+      payment = inspection.payment;
+      paystack = inspection.transaction;
+      if (payment.status === 'PAID') {
+        const result = await reconcilePaidPayment(payment);
+        return response.status(200).json({ payment: result.payment, earning: result.earning, alreadyVerified: true });
+      }
+      if (paystack.status !== 'success') return sendUnpaidPayment(response, inspection);
+    } else {
+      paystack = await verifyPaystackTransaction(reference);
+    }
     if (paystack.status !== 'success') throw new AppError('Paystack has not marked this transaction successful.', 409);
 
     const result = await settlePayment(payment, paystack);

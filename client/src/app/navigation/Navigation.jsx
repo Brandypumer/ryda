@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { LogoutButton, useAuth } from '../../features/identity';
 import { BrandMark } from '../../shared/ui';
+import { AppearanceButton, ThemeQuickToggle } from '../../shared/theme';
 
 const publicLinks = [
   { to: '/', label: 'Home' },
@@ -85,6 +86,8 @@ export default function Navigation() {
           </div>
 
           <div className="hidden items-center gap-2 lg:flex">
+            <ThemeQuickToggle />
+            <AppearanceButton compact />
             {isAuthenticated ? (
               <>
                 <NavLink className={({ isActive }) => `max-w-40 truncate rounded-lg px-3 py-2 text-sm font-medium ${isActive ? 'bg-ryda-50 text-ryda-800' : 'text-slate-700 hover:bg-slate-50 hover:text-slate-950'}`} to="/profile">{user?.fullName || 'Profile'}</NavLink>
@@ -119,13 +122,17 @@ export default function Navigation() {
               {isAuthenticated ? (
                 <>
                   <AppNavLink link={{ to: '/profile', label: 'Profile' }} mobile onNavigate={closeMenu} />
+                  <div className="mt-2 flex gap-2 border-t border-slate-200 pt-3"><ThemeQuickToggle /><AppearanceButton /></div>
                   <div className="mt-2 border-t border-slate-200 pt-3"><LogoutButton className="w-full" /></div>
                 </>
               ) : (
+                <>
+                  <div className="mt-2 flex gap-2 border-t border-slate-200 pt-3"><ThemeQuickToggle /><AppearanceButton /></div>
                 <div className="mt-2 grid grid-cols-2 gap-3 border-t border-slate-200 pt-3">
                   <NavLink className="rounded-lg border border-slate-300 px-3 py-2.5 text-center text-sm font-semibold text-slate-800 hover:bg-slate-50" onClick={closeMenu} to="/login">Log in</NavLink>
                   <NavLink className="rounded-lg bg-ryda-700 px-3 py-2.5 text-center text-sm font-semibold text-white hover:bg-ryda-800" onClick={closeMenu} to="/register">Get started</NavLink>
                 </div>
+                </>
               )}
             </div>
           </div>

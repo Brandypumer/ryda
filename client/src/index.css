@@ -155,3 +155,12 @@
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
+
+.appearance-backdrop { position: fixed; inset: 0; z-index: 60; display: flex; justify-content: flex-end; background: rgb(15 23 42 / 42%); animation: appearance-fade-in 180ms ease-out both; }
+.appearance-panel { width: min(100%, 28rem); height: 100%; overflow: hidden; background: var(--surface, #fff); color: var(--text-primary, #0f172a); box-shadow: -1rem 0 3rem rgb(15 23 42 / 18%); animation: appearance-slide-in 220ms ease-out both; outline: none; }
+.appearance-panel button { color: inherit; }
+@keyframes appearance-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes appearance-slide-in { from { opacity: .7; transform: translateX(2rem); } to { opacity: 1; transform: translateX(0); } }
+.reduce-motion .appearance-backdrop, .reduce-motion .appearance-panel { animation: none; }
+@media (max-width: 640px) { .appearance-backdrop { align-items: flex-end; } .appearance-panel { width: 100%; max-height: 92vh; height: auto; border-radius: 1.25rem 1.25rem 0 0; animation-name: appearance-sheet-in; } }
+@keyframes appearance-sheet-in { from { opacity: .7; transform: translateY(2rem); } to { opacity: 1; transform: translateY(0); } }

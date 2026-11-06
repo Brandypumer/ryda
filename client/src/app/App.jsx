@@ -6,6 +6,7 @@ import { PageContainer } from '../shared/ui';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../features/identity';
 import { getRoleDestination } from '../features/identity/roleDestination';
+import { AppearancePanel } from '../shared/theme';
 
 const publicPaths = new Set(['/', '/about', '/how-it-works', '/safety', '/help', '/contact', '/privacy', '/terms', '/login', '/register']);
 
@@ -20,7 +21,7 @@ export default function App() {
   }
 
   if (useApplicationShell) {
-    return (
+    return (<>
       <div className="flex min-h-screen bg-[#f7f8f7]">
         <ApplicationSidebar />
         <div className="min-w-0 flex-1 lg:pl-64">
@@ -30,10 +31,11 @@ export default function App() {
           </main>
         </div>
       </div>
-    );
+      <AppearancePanel />
+    </>);
   }
 
-  return (
+  return (<>
     <div className="app-shell">
       <Navigation />
       <main className="page-transition flex-1 py-6 sm:py-8 lg:py-10">
@@ -43,5 +45,6 @@ export default function App() {
       </main>
       <Footer />
     </div>
-  );
+    <AppearancePanel />
+  </>);
 }

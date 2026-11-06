@@ -13,9 +13,15 @@
       (() => {
         try {
           const preference = localStorage.getItem('ryda.theme') || 'system';
+          const displayMode = localStorage.getItem('ryda.display-mode') || 'system';
           const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-          document.documentElement.dataset.theme = preference === 'system' ? (dark ? 'dark-plus' : 'light-plus') : preference;
+          const darkThemes = ['dark-plus', 'kimbie-dark', 'abyss', 'red', 'monokai-dimmed', 'solarized-dark', 'tomorrow-night-blue'];
+          const selectedIsDark = darkThemes.includes(preference);
+          const modeIsDark = displayMode === 'dark' || (displayMode === 'system' && dark);
+          const active = modeIsDark ? (selectedIsDark ? preference : 'dark-plus') : (selectedIsDark ? 'light-plus' : preference);
+          document.documentElement.dataset.theme = active;
           document.documentElement.dataset.themePreference = preference;
+          document.documentElement.dataset.displayMode = displayMode;
         } catch (_) {}
       })();
     </script>

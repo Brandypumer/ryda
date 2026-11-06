@@ -16,7 +16,7 @@ function locationLabel(location) {
 function amount(value) {
   return typeof value === 'number'
     ? new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 }).format(value)
-    : 'Integration pending';
+    : 'pending';
 }
 
 function eligibilityMessage(dashboard) {

@@ -65,7 +65,7 @@ export function ContactPage() {
         <label className="block text-sm font-medium text-slate-700">Subject<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-slate-900 focus:border-ryda-600 focus:outline-none focus:ring-2 focus:ring-ryda-100" name="subject" placeholder="How can we help?" required /></label>
         <label className="block text-sm font-medium text-slate-700">Message<textarea className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-slate-900 focus:border-ryda-600 focus:outline-none focus:ring-2 focus:ring-ryda-100" name="message" placeholder="Tell us what you need help with" required rows="5" /></label>
         <p className="rounded-lg bg-amber-50 p-3 text-sm leading-6 text-amber-900">Contact form delivery is not connected yet, so this form does not send a message. Please use the support channel provided by your campus or project administrator.</p>
-        <button className="rounded-lg bg-slate-300 px-5 py-3 text-sm font-semibold text-slate-600" disabled type="submit">Send message (not connected)</button>
+        <button className="rounded-lg bg-slate-300 px-5 py-3 text-sm font-semibold text-slate-600" disabled type="submit">Send message</button>
       </form>
     </PageIntro>
   );
